@@ -1,2 +1,5 @@
 /.env
 /.vscode
+uids.json
+err.log
+test.json
