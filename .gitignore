@@ -1,5 +1,5 @@
 /.env
 /.vscode
-uids.json
+data.json
 err.log
 test.json
