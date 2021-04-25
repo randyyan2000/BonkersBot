@@ -1,5 +1,6 @@
 /.env
 /.vscode
+/__pycache__/
 data.json
-err.log
+discord.log
 test.json
