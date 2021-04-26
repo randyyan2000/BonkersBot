@@ -48,11 +48,11 @@ async def bonk(ctx):
     bonks = read_user_data(ctx.author.id, 'bonks') or 0
     bonks += 1
     write_user_data(ctx.author.id, data={'bonks': bonks})
-    await ctx.send(f'Boop. {reply_mention(ctx)} has bonked the bonkers {bonks} times')
+    await ctx.send(f'Boop. {reply_mention(ctx)} has bonked the bonkers {bonks} time{"" if bonks == 1 else "s"}')
 
 
 @bot.command(aliases=('update', 'u'), help='runs an osu!track update for your registered profile (see $register) or an explicitly specified uid $update `<uid>`')
-async def osu_update(ctx, osuid=None):
+async def osu_update(ctx, osuid=None, showhs=True):
     if not osuid:
         osuid = get_osuid(ctx)
     
@@ -76,20 +76,24 @@ async def osu_update(ctx, osuid=None):
         **Playcount**: {r["playcount"]}\n\
         **Acc**: {format_diff(round(r["accuracy"], 2))}\n\n\
         **New Highscores**: {len(r["newhs"])}{" <:KEKW:805177941814018068>" if len(r["newhs"]) == 0 else ""}\n\
-        {chr(10).join(map(format_hs, r["newhs"]))}'
+        {chr(10).join(map(format_score_inline, r["newhs"])) if showhs else ''}'
     )
     updateEmbed.set_thumbnail(url=osu.profile_thumb(osuid))
     await ctx.send(embed=updateEmbed)
-
-    hsEmbeds = [get_score_embed(hs, osuid, r["username"]) for hs in r["newhs"]]
-    for embed in hsEmbeds:
-        await ctx.send(embed=embed)
+    if showhs:
+        hsEmbeds = [get_score_embed(hs, osuid, r["username"]) for hs in r["newhs"]]
+        for embed in hsEmbeds:
+            await ctx.send(embed=embed)
 
 
 @bot.command(aliases=('t', 'top'), help='$top (<rank=1>) (<username/userid>) gets the top #rank score for a given osu user (defaults to your registered user)')
 async def osu_top(ctx, rank: int=1, u: str=''):
+    if rank < 1 or rank > 100:
+        return ctx.send('invalid score rank (must be between 1-100)')
     if not u:
         u = get_osuid(ctx)
+    if not u:
+        return ctx.send('invalid user')
     response = requests.post(f'{OSU_API_ENDPOINT}get_user_best', params={'k': OSU_API_KEY, 'u': u, 'limit': rank})
     score = response.json()[rank - 1]
     score['ranking'] = rank - 1
@@ -97,14 +101,46 @@ async def osu_top(ctx, rank: int=1, u: str=''):
     await ctx.send(embed=get_score_embed(score, user['user_id'], user['username']))
 
 
-@bot.command(aliases=('register', 'r'), help='registers an osu account to your discord user so you don\'t have to specify a user when running updates')
+@bot.command(aliases=('tr', 'topr', 'toprange'), help='$toprange (<rankstart=1>) (<rankend=1>) (<username/userid>) gets a range of top scores for a given osu user (defaults to your registered user)')
+async def osu_toprange(ctx, rankstart: int=1, rankend: int=10, u: str=''):
+    if rankstart < 1 or rankend < 1 or rankend > 100 or rankstart > rankend or rankend - rankstart >= 15:
+        return await ctx.send('invalid score rank range (max 15 scores, ranks must be between 1-100) ')
+    if not u:
+        u = get_osuid(ctx)
+    if not u:
+        return await ctx.send('invalid user')
+    response = requests.post(f'{OSU_API_ENDPOINT}get_user_best', params={'k': OSU_API_KEY, 'u': u, 'limit': rankend})
+    scores = response.json()[rankstart - 1: rankend]
+    for i, score in enumerate(scores):
+        score['ranking'] = rankstart - 1 + i
+    user = get_user(u)
+
+    toprangeEmbed = Embed(
+        type='rich',
+        color=EMBED_COLOR,
+        description='\n'.join(map(format_score_inline, scores))
+    )
+    toprangeEmbed.set_author(
+        name=f'Top {rankstart} - {rankend} scores for {user["username"]}',
+        url=osu.profile_link(user["user_id"]),
+        icon_url=osu.profile_thumb(user["user_id"]),
+    )
+    await ctx.send(embed=toprangeEmbed)
+
+
+@bot.command(aliases=('register', 'r'), help='registers an osu account to your discord user and runs an intial osu!track update')
 async def osu_register(ctx, osuid=None):
     if not osuid:
         return await ctx.send('Please specify an osu profile id!')
     else:
-        write_user_data(ctx.author.id, data={'osuid': osuid})
-        await ctx.message.add_reaction('✅')
-        await ctx.send(f'User 40870022 registered to {reply_mention(ctx)}')
+        oldid = get_osuid(ctx)
+        if oldid != osuid:
+            write_user_data(ctx.author.id, data={'osuid': osuid})
+            await ctx.message.add_reaction('✅')
+            await ctx.send(f'User 40870022 registered to {reply_mention(ctx)}')
+            await osu_update(ctx, osuid=osuid, showhs=False)
+        else:
+            await ctx.send(f'osu user id {osuid} already registered')
 
 
 @bot.command(aliases=('profile', 'p'), help='displays a profile card for an osu account (default yours)')
@@ -129,7 +165,7 @@ async def dev_test(ctx):
         **Playcount**: {r["playcount"]}\n\
         **Acc**: {format_diff(round(r["accuracy"], 2))}\n\n\
         **New Highscores**: {len(r["newhs"])}{" <:KEKW:805177941814018068>" if len(r["newhs"]) == 0 else ""}\n\
-        {chr(10).join(map(format_hs, r["newhs"]))}'
+        {chr(10).join(map(format_score_inline, r["newhs"]))}'
     )
     updateEmbed.set_thumbnail(url=osu.profile_thumb(osuid))
     await ctx.send(embed=updateEmbed)
@@ -141,8 +177,7 @@ async def dev_test(ctx):
 
 def get_score_embed(score, osuid, username):
     if 'meta' not in score:
-        response = requests.post(f'{OSU_API_ENDPOINT}get_beatmaps', params={'k': OSU_API_KEY, 'b': score["beatmap_id"]})
-        score['meta'] = response.json()[0]
+        score['meta'] = get_beatmap(score["beatmap_id"])
     bmp = score['meta']
     title = f'{bmp["title"]}[{bmp["version"]}] | {round(float(bmp["difficultyrating"]), 2)}★'
     scoreEmbed = Embed(
@@ -155,15 +190,6 @@ def get_score_embed(score, osuid, username):
         {score["pp"]}pp | \
         {get_score_timedelta(score)}**',
     )
-    # scoreEmbed.add_field(
-    #     name=f'#{score["ranking"] + 1}: [{title}]({osu.beatmap_link(score["beatmap_id"])})',
-    #     value=f'**{osu_score_emoji(score["rank"])} | \
-    #         {osu.mod_string(int(score["enabled_mods"]))} | \
-    #         {get_score_acc(score)}% ({score["maxcombo"]}/{bmp["max_combo"]} max) | \
-    #         {score["pp"]}pp | \
-    #         {get_score_timedelta(score)}**',
-    #     inline=False
-    # )
     scoreEmbed.add_field(
         name='Beatmap Info',
         value=f'Length **{format_seconds(int(bmp["total_length"]))}** ~ \
@@ -267,17 +293,18 @@ def format_seconds(seconds):
     return time.strftime(fmt, time.gmtime(seconds))
 
 
-def format_hs(hs):
-    response = requests.post(f'{OSU_API_ENDPOINT}get_beatmaps', params={'k': OSU_API_KEY, 'b': hs["beatmap_id"]})
-    meta = response.json()[0]
-    hs['meta'] = meta
+def format_score_inline(score):
+    if 'meta' not in score:
+        score['meta'] = get_beatmap(score["beatmap_id"])
+    meta = score['meta']
     title = format_title(meta['title'], meta['version'])
-    return f'**#{hs["ranking"] + 1}**: [{title}](https://osu.ppy.sh/b/{hs["beatmap_id"]}) \t| {osu_score_emoji(hs["rank"])} {get_score_acc(hs)}% \t| {hs["pp"]}pp'
+    modString = f'**{osu.mod_string(int(score["enabled_mods"]))}**' if int(score["enabled_mods"]) > 0 else ''
+    return f'**#{score["ranking"] + 1}**: [{title}](https://osu.ppy.sh/b/{score["beatmap_id"]}){modString} \t| {osu_score_emoji(score["rank"])} {get_score_acc(score)}% \t| {score["pp"]}pp'
 
 
 def format_title(title, diff):
-    if len(title) + len(diff) > 35:
-        return f'{title[:32 - len(diff)]}...[{diff}]'
+    if len(title) + len(diff) > 25:
+        return f'{title[:23 - len(diff)]}...[{diff}]'
     else:
         return f'{title}[{diff}]'
 
@@ -295,6 +322,11 @@ def reply_mention(ctx):
 
 def get_user(u: str):
     return requests.post(f'{OSU_API_ENDPOINT}get_user', params={'k': OSU_API_KEY, 'u': u}).json()[0]
+
+
+def get_beatmap(beatmapid: str):
+    return requests.post(f'{OSU_API_ENDPOINT}get_beatmaps', params={'k': OSU_API_KEY, 'b': beatmapid}).json()[0]
+
 
 OSU_SCORE_EMOJI_MAP = {
     'XH': '<:osuXH:835607165279797269>',

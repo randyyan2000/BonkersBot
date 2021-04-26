@@ -31,7 +31,7 @@ MODS_ENUM = {
     'V2'  : 536870912,
 }
 
-def mod_string(modnum):
+def mod_string(modnum, nm='NM'):
     # e.g. '+HDDT'
     modStrs = []
     for mod in MODS_ENUM:
@@ -44,7 +44,7 @@ def mod_string(modnum):
             modStrs.remove('SD')
         return f'+{"".join(modStrs)}'
     else:
-        return 'NM'
+        return nm
 
 
 def profile_thumb(osuid):
