@@ -1,10 +1,10 @@
 # bot.py
 import os
 
-from typing import List
+from typing import Dict, List, Mapping, Optional, Union
 
 from discord.ext import commands, tasks
-from discord import Embed, Color
+from discord import Embed, Color, Emoji
 import requests
 from dotenv import load_dotenv
 import json
@@ -34,7 +34,19 @@ EMBED_COLOR = Color.from_rgb(255, 165, 0)
 
 KEKW_EMOTE = '<:KEKW:805177941814018068>'
 SADGE_EMOTE = '<:Sadge:805178964652982282>'
+OSU_SCORE_EMOJI_MAP: Mapping[osu.ScoreRank, Emoji] = {
+    'XH': '<:osuXH:835607165279797269>',
+    'SSH': '<:osuXH:835607165279797269>',
+    'SS': '<:osuSS:835607691787239435>',
+    'SH': '<:osuSH:835607165653745684>',
+    'S' : '<:osuS:835607691790647327>',
+    'A' : '<:osuA:835607165263020052>',
+    'B' : '<:osuB:835611278357299202>',
+    'C' : '<:osuC:835611278172487694>',
+}
 
+#typing setup
+Context = commands.Context
 
 AUTO_UPDATE_CHANNEL_ID: int = 0
 
@@ -46,20 +58,20 @@ async def on_ready():
 
 
 @bot.command(help='Says Hello!')
-async def hello(ctx):
+async def hello(ctx: Context):
     await ctx.send('Hello!')
 
 
 @bot.command(help='Bonk the bonkers')
-async def bonk(ctx):
-    bonks = read_user_data(ctx.author.id, 'bonks') or 0
+async def bonk(ctx: Context):
+    bonks: int = read_user_data(ctx.author.id, 'bonks') or 0
     bonks += 1
     write_user_data(ctx.author.id, data={'bonks': bonks})
     await ctx.send(f'Boop. {reply_mention(ctx)} has bonked the bonkers {bonks} time{"" if bonks == 1 else "s"}')
 
 
 @bot.command(aliases=('update', 'u'), help='runs an osu!track update for your registered profile (see $register) or an explicitly specified uid $update `<uid>`')
-async def osu_update(ctx, osuid=None, showhs=True):
+async def osu_update(ctx: Context, osuid: int=0, showhs: bool=True):
     if not osuid:
         osuid = get_osuid(ctx)
     
@@ -94,7 +106,7 @@ async def osu_update(ctx, osuid=None, showhs=True):
 
 
 @bot.command(aliases=('t', 'top'), help='$top (<rank=1>) (<username/userid>) gets the top #rank score for a given osu user (defaults to your registered user)')
-async def osu_top(ctx, rank: int=1, u: str=''):
+async def osu_top(ctx: Context, rank: int=1, u: str=''):
     if rank < 1 or rank > 100:
         return ctx.send('invalid score rank (must be between 1-100)')
     if not u:
@@ -109,7 +121,7 @@ async def osu_top(ctx, rank: int=1, u: str=''):
 
 
 @bot.command(aliases=('tr', 'topr', 'toprange'), help='$toprange (<rankstart=1>) (<rankend=1>) (<username/userid>) gets a range of top scores for a given osu user (defaults to your registered user)')
-async def osu_toprange(ctx, rankstart: int=1, rankend: int=10, u: str=''):
+async def osu_toprange(ctx: Context, rankstart: int=1, rankend: int=10, u: str=''):
     if rankstart < 1 or rankend < 1 or rankend > 100 or rankstart > rankend or rankend - rankstart >= 15:
         return await ctx.send('invalid score rank range (max 15 scores, ranks must be between 1-100) ')
     if not u:
@@ -134,7 +146,7 @@ async def osu_toprange(ctx, rankstart: int=1, rankend: int=10, u: str=''):
 
 
 @bot.command(aliases=('register', 'r'), help='registers an osu account to your discord user and runs an intial osu!track update')
-async def osu_register(ctx, osuid=None):
+async def osu_register(ctx: Context, osuid: int=None):
     if not osuid:
         return await ctx.send('Please specify an osu profile id!')
     else:
@@ -149,7 +161,7 @@ async def osu_register(ctx, osuid=None):
 
 
 @bot.command(aliases=('profile', 'p'), help='displays a profile card for an osu account (default yours)')
-async def osu_profile(ctx, u=None):
+async def osu_profile(ctx: Context, u: str=''):
     if not u:
         u = get_osuid(ctx)
     user = get_user(u)
@@ -164,13 +176,14 @@ async def osu_auto_update():
     for uid, osuid in osuids:
         topScores = get_top_scores(u=osuid, limit=100)
         recentTopScores = list(filter(is_recent_score, topScores))
-        allRecentTopScores[(uid, osuid)] = recentTopScores
+        if len(recentTopScores):
+            allRecentTopScores[(uid, osuid)] = recentTopScores
 
     if len(allRecentTopScores): 
-        await channel.send('Top scores from past hour 🎉')
+        await channel.send('New top scores from the past hour 🎉')
         for (uid, osuid), scores in allRecentTopScores.items():
             if len(scores):
-                await channel.send(f'Top scores for <@{uid}>')
+                await channel.send(f'New top scores for <@{uid}>')
                 user = get_user(osuid)
                 for score in scores:
                     await channel.send(embed=get_score_embed(score, osuid, user['username']))
@@ -178,7 +191,7 @@ async def osu_auto_update():
         await channel.send(f'No top scores in past hour {SADGE_EMOTE}')
 
 
-def is_recent_score(score, timedelta=dt.timedelta(hours=1, minutes=1)):
+def is_recent_score(score, timedelta=dt.timedelta(hours=1, minutes=1)) -> bool:
     '''
         Returns True if `score` was submitted within `timedelta` (default 1 day) time before datetime.utcnow() 
     '''
@@ -204,6 +217,7 @@ async def enable_osu_automatic_updates_error(ctx, error):
 
 @bot.command(aliases=('dt', 'test'), help='command used for testing during development')
 async def dev_test(ctx):
+    # set up test data
     osuid = 17626463
     r = json.load(open('test.json', 'r'))
     updateEmbed = Embed(
@@ -226,7 +240,7 @@ async def dev_test(ctx):
         await ctx.send(embed=embed)
 
 
-def get_score_embed(score, osuid, username):
+def get_score_embed(score: osu.Score, osuid: str, username: str) -> Embed:
     if 'meta' not in score:
         score['meta'] = get_beatmap(score["beatmap_id"])
     bmp = score['meta']
@@ -258,7 +272,7 @@ def get_score_embed(score, osuid, username):
     return scoreEmbed
 
 
-def get_user_embed(user):
+def get_user_embed(user: osu.User) -> Embed:
     osuid = user['user_id']
     userEmbed = Embed(
         title=f'{flag.flag(user["country"])} {user["username"]} - {user["pp_raw"]}pp (#{user["pp_rank"]}) ({user["country"]} #{user["pp_country_rank"]})', 
@@ -309,7 +323,7 @@ def get_user_embed(user):
     return userEmbed
 
 
-def write_user_data(uid, data={}, truncate=False):
+def write_user_data(uid: str, data: Dict={}, truncate: bool=False) -> None:
     with open(USER_DATA, "r") as fp:
         allData = json.load(fp)
     userData = allData[f'{uid}'] if f'{uid}' in allData else {}
@@ -322,7 +336,7 @@ def write_user_data(uid, data={}, truncate=False):
         json.dump(allData, fp, sort_keys=True, indent=4)
 
 
-def read_user_data(uid, key=None):
+def read_user_data(uid: str, key: str=''):
     with open(USER_DATA, "r") as fp:
         allData = json.load(fp)
     userData = allData[f'{uid}'] if f'{uid}' in allData else {}
@@ -332,7 +346,7 @@ def read_user_data(uid, key=None):
         return userData
 
 
-def get_osuid(ctx):
+def get_osuid(ctx: Context) -> Optional[str]:
     return read_user_data(ctx.author.id, 'osuid')
 
 
@@ -342,7 +356,7 @@ def get_all_osuid() -> List[str]:
         return [(uid, allData[uid]['osuid']) for uid in allData if 'osuid' in allData[uid]]
 
 
-def format_seconds(seconds):
+def format_seconds(seconds: int) -> str:
     if seconds >= 86400:
         # formatting play time
         fmt = '%'
@@ -350,7 +364,7 @@ def format_seconds(seconds):
     return time.strftime(fmt, time.gmtime(seconds))
 
 
-def format_score_inline(score):
+def format_score_inline(score: osu.Score) -> str:
     if 'meta' not in score:
         score['meta'] = get_beatmap(score["beatmap_id"])
     meta = score['meta']
@@ -359,25 +373,25 @@ def format_score_inline(score):
     return f'**#{score["ranking"] + 1}**: [{title}](https://osu.ppy.sh/b/{score["beatmap_id"]}){modString} \t| {osu_score_emoji(score["rank"])} {get_score_acc(score)}% \t| {score["pp"]}pp'
 
 
-def format_title(title, diff):
+def format_title(title: str, diff: str):
     if len(title) + len(diff) > 25:
         return f'{title[:23 - len(diff)]}...[{diff}]'
     else:
         return f'{title}[{diff}]'
 
 
-def format_diff(d):
+def format_diff(d: int):
     if d > 0:
         return f'+{str(d)}'
     else:
         return str(d)
 
 
-def reply_mention(ctx):
+def reply_mention(ctx: Context) -> str:
     return f'<@{ctx.author.id}>'
 
 
-def get_user(u: str):
+def get_user(u: str) -> osu.User:
     return requests.post(f'{OSU_API_ENDPOINT}get_user', params={'k': OSU_API_KEY, 'u': u}).json()[0]
 
 
@@ -385,32 +399,24 @@ def get_beatmap(beatmapid: str):
     return requests.post(f'{OSU_API_ENDPOINT}get_beatmaps', params={'k': OSU_API_KEY, 'b': beatmapid}).json()[0]
 
 
-def get_top_scores(u: str, limit: int):
+def get_top_scores(u: str, limit: int) -> List[osu.Score]:
     topScores = requests.post(f'{OSU_API_ENDPOINT}get_user_best', params={'k': OSU_API_KEY, 'u': u, 'limit': limit}).json()
     for i, score in enumerate(topScores):
         score["ranking"] = i
     return topScores
 
 
-OSU_SCORE_EMOJI_MAP = {
-    'XH': '<:osuXH:835607165279797269>',
-    'SS': '<:osuSS:835607691787239435>',
-    'SH': '<:osuSH:835607165653745684>',
-    'S' : '<:osuS:835607691790647327>',
-    'A' : '<:osuA:835607165263020052>',
-    'B' : '<:osuB:835611278357299202>',
-    'C' : '<:osuC:835611278172487694>',
-}
-
-def get_score_acc(score):
+def get_score_acc(score: osu.Score):
     countmiss, count50, count100, count300 = int(score["countmiss"]), int(score["count50"]), int(score["count100"]), int(score["count300"])
     acc = (count50 + 2 * count100 + 6 * count300) / (countmiss + count50 + count100 + count300) / 6 * 100 # see https://osu.ppy.sh/wiki/en/Accuracy
     return round(acc, 2)
 
-def get_score_timedelta(score):
+
+def get_score_timedelta(score: osu.Score) -> dt.timedelta:
     return naturaltime(dt.datetime.utcnow() - dt.datetime.fromisoformat(score['date']))
 
-def osu_score_emoji(rank):
+
+def osu_score_emoji(rank: osu.ScoreRank) -> Union[Emoji, str]:
     return OSU_SCORE_EMOJI_MAP[rank] if rank in OSU_SCORE_EMOJI_MAP else f'**{rank}**'
 
 
