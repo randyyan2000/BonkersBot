@@ -358,10 +358,17 @@ def get_all_osuid() -> List[str]:
 
 def format_seconds(seconds: int) -> str:
     if seconds >= 86400:
-        # formatting play time
-        fmt = '%'
-    fmt = '%H:%M:%S' if seconds >= 3600 else '%M:%S'
-    return time.strftime(fmt, time.gmtime(seconds))
+        # format play time
+        days = seconds // 86400
+        seconds %= 86400
+        hours = seconds // 3600
+        seconds %= 3600
+        minutes = seconds // 60
+        return f'{days}d {hours}h {minutes}m'
+    else:
+        # format bmp length
+        fmt = '%H:%M:%S' if seconds >= 3600 else '%M:%S'
+        return time.strftime(fmt, time.gmtime(seconds))
 
 
 def format_score_inline(score: osu.Score) -> str:
