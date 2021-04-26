@@ -1,7 +1,9 @@
 # bot.py
 import os
 
-from discord.ext import commands
+from typing import List
+
+from discord.ext import commands, tasks
 from discord import Embed, Color
 import requests
 from dotenv import load_dotenv
@@ -13,7 +15,6 @@ import time
 import osu
 import logging
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger('discord')
 logger.setLevel(logging.DEBUG)
 handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w')
@@ -30,6 +31,12 @@ OSU_API_ENDPOINT = 'https://osu.ppy.sh/api/'
 
 PREFIX = '$'
 EMBED_COLOR = Color.from_rgb(255, 165, 0)
+
+KEKW_EMOTE = '<:KEKW:805177941814018068>'
+SADGE_EMOTE = '<:Sadge:805178964652982282>'
+
+
+AUTO_UPDATE_CHANNEL_ID: int = 0
 
 bot = commands.Bot(command_prefix=PREFIX)
 
@@ -75,8 +82,8 @@ async def osu_update(ctx, osuid=None, showhs=True):
         **PP**: {format_diff(round(r["pp_raw"], 4))}\n\
         **Playcount**: {r["playcount"]}\n\
         **Acc**: {format_diff(round(r["accuracy"], 2))}\n\n\
-        **New Highscores**: {len(r["newhs"])}{" <:KEKW:805177941814018068>" if len(r["newhs"]) == 0 else ""}\n\
-        {chr(10).join(map(format_score_inline, r["newhs"])) if showhs else ''}'
+        **New Highscores**: {len(r["newhs"])}{f" {KEKW_EMOTE}" if len(r["newhs"]) == 0 else ""}\n\
+        {chr(10).join(map(format_score_inline, r["newhs"])) if showhs else ""}'
     )
     updateEmbed.set_thumbnail(url=osu.profile_thumb(osuid))
     await ctx.send(embed=updateEmbed)
@@ -109,10 +116,8 @@ async def osu_toprange(ctx, rankstart: int=1, rankend: int=10, u: str=''):
         u = get_osuid(ctx)
     if not u:
         return await ctx.send('invalid user')
-    response = requests.post(f'{OSU_API_ENDPOINT}get_user_best', params={'k': OSU_API_KEY, 'u': u, 'limit': rankend})
-    scores = response.json()[rankstart - 1: rankend]
-    for i, score in enumerate(scores):
-        score['ranking'] = rankstart - 1 + i
+    topScores = get_top_scores(u, rankend)
+    scores = topScores[rankstart - 1: rankend]
     user = get_user(u)
 
     toprangeEmbed = Embed(
@@ -148,7 +153,53 @@ async def osu_profile(ctx, u=None):
     if not u:
         u = get_osuid(ctx)
     user = get_user(u)
-    await ctx.send(embed=get_user_embed(user))    
+    await ctx.send(embed=get_user_embed(user))
+
+
+@tasks.loop(hours=1)
+async def osu_auto_update():
+    channel = bot.get_channel(AUTO_UPDATE_CHANNEL_ID)
+    allRecentTopScores = {}
+    osuids = get_all_osuid()
+    for uid, osuid in osuids:
+        topScores = get_top_scores(u=osuid, limit=100)
+        recentTopScores = list(filter(is_recent_score, topScores))
+        allRecentTopScores[(uid, osuid)] = recentTopScores
+
+    if len(allRecentTopScores): 
+        await channel.send('Top scores from past hour 🎉')
+        for (uid, osuid), scores in allRecentTopScores.items():
+            if len(scores):
+                await channel.send(f'Top scores for <@{uid}>')
+                user = get_user(osuid)
+                for score in scores:
+                    await channel.send(embed=get_score_embed(score, osuid, user['username']))
+    else:
+        await channel.send(f'No top scores in past hour {SADGE_EMOTE}')
+
+
+def is_recent_score(score, timedelta=dt.timedelta(hours=1, minutes=1)):
+    '''
+        Returns True if `score` was submitted within `timedelta` (default 1 day) time before datetime.utcnow() 
+    '''
+    return dt.datetime.utcnow() - dt.datetime.fromisoformat(score['date']) < timedelta
+
+
+@bot.command(help='enables automatic updates of highscores for registered users')
+@commands.has_permissions(administrator=True)
+async def enable_osu_automatic_updates(ctx):
+    global AUTO_UPDATE_CHANNEL_ID
+    if AUTO_UPDATE_CHANNEL_ID:
+        osu_auto_update.stop()
+    AUTO_UPDATE_CHANNEL_ID = ctx.channel.id
+    await ctx.message.add_reaction('✅')
+    await ctx.send(f'Bonkers will now automatically send top scores in <#{ctx.channel.id}>')
+    osu_auto_update.start()
+
+
+@enable_osu_automatic_updates.error
+async def enable_osu_automatic_updates_error(ctx, error):
+    await ctx.send('You must be an admin to enable automatic top score updates')
 
 
 @bot.command(aliases=('dt', 'test'), help='command used for testing during development')
@@ -285,6 +336,12 @@ def get_osuid(ctx):
     return read_user_data(ctx.author.id, 'osuid')
 
 
+def get_all_osuid() -> List[str]:
+    with open(USER_DATA, "r") as fp:
+        allData = json.load(fp)
+        return [(uid, allData[uid]['osuid']) for uid in allData if 'osuid' in allData[uid]]
+
+
 def format_seconds(seconds):
     if seconds >= 86400:
         # formatting play time
@@ -326,6 +383,13 @@ def get_user(u: str):
 
 def get_beatmap(beatmapid: str):
     return requests.post(f'{OSU_API_ENDPOINT}get_beatmaps', params={'k': OSU_API_KEY, 'b': beatmapid}).json()[0]
+
+
+def get_top_scores(u: str, limit: int):
+    topScores = requests.post(f'{OSU_API_ENDPOINT}get_user_best', params={'k': OSU_API_KEY, 'u': u, 'limit': limit}).json()
+    for i, score in enumerate(topScores):
+        score["ranking"] = i
+    return topScores
 
 
 OSU_SCORE_EMOJI_MAP = {
