@@ -1,7 +1,7 @@
 # bot.py
 import os
 
-from typing import Dict, List, Mapping, Optional, Union
+from typing import Dict, List, Mapping, Optional, Tuple, Union
 
 from discord.ext import commands, tasks
 from discord import Embed, Color, Emoji
@@ -34,7 +34,7 @@ EMBED_COLOR = Color.from_rgb(255, 165, 0)
 
 KEKW_EMOTE = '<:KEKW:805177941814018068>'
 SADGE_EMOTE = '<:Sadge:805178964652982282>'
-OSU_SCORE_EMOJI_MAP: Mapping[osu.ScoreRank, Emoji] = {
+OSU_SCORE_EMOJI_MAP: Mapping[osu.ScoreRank, str] = {
     'XH': '<:osuXH:835607165279797269>',
     'SSH': '<:osuXH:835607165279797269>',
     'SS': '<:osuSS:835607691787239435>',
@@ -64,14 +64,14 @@ async def hello(ctx: Context):
 
 @bot.command(help='Bonk the bonkers')
 async def bonk(ctx: Context):
-    bonks: int = read_user_data(ctx.author.id, 'bonks') or 0
+    bonks = int(read_user_data(ctx.author.id, 'bonks') or 0)
     bonks += 1
     write_user_data(ctx.author.id, data={'bonks': bonks})
     await ctx.send(f'Boop. {reply_mention(ctx)} has bonked the bonkers {bonks} time{"" if bonks == 1 else "s"}')
 
 
 @bot.command(aliases=('update', 'u'), help='runs an osu!track update for your registered profile (see $register) or an explicitly specified uid $update `<uid>`')
-async def osu_update(ctx: Context, osuid: int=0, showhs: bool=True):
+async def osu_update(ctx: Context, osuid: Optional[str]=None, showhs: bool=True):
     if not osuid:
         osuid = get_osuid(ctx)
     
@@ -106,7 +106,7 @@ async def osu_update(ctx: Context, osuid: int=0, showhs: bool=True):
 
 
 @bot.command(aliases=('t', 'top'), help='$top (<rank=1>) (<username/userid>) gets the top #rank score for a given osu user (defaults to your registered user)')
-async def osu_top(ctx: Context, rank: int=1, u: str=''):
+async def osu_top(ctx: Context, rank: int=1, u: Optional[str]=None):
     if rank < 1 or rank > 100:
         return ctx.send('invalid score rank (must be between 1-100)')
     if not u:
@@ -121,7 +121,7 @@ async def osu_top(ctx: Context, rank: int=1, u: str=''):
 
 
 @bot.command(aliases=('tr', 'topr', 'toprange'), help='$toprange (<rankstart=1>) (<rankend=1>) (<username/userid>) gets a range of top scores for a given osu user (defaults to your registered user)')
-async def osu_toprange(ctx: Context, rankstart: int=1, rankend: int=10, u: str=''):
+async def osu_toprange(ctx: Context, rankstart: int=1, rankend: int=10, u: Optional[str]=None):
     if rankstart < 1 or rankend < 1 or rankend > 100 or rankstart > rankend or rankend - rankstart >= 15:
         return await ctx.send('invalid score rank range (max 15 scores, ranks must be between 1-100) ')
     if not u:
@@ -146,7 +146,7 @@ async def osu_toprange(ctx: Context, rankstart: int=1, rankend: int=10, u: str='
 
 
 @bot.command(aliases=('register', 'r'), help='registers an osu account to your discord user and runs an intial osu!track update')
-async def osu_register(ctx: Context, osuid: int=None):
+async def osu_register(ctx: Context, osuid: Optional[str]=None):
     if not osuid:
         return await ctx.send('Please specify an osu profile id!')
     else:
@@ -161,9 +161,11 @@ async def osu_register(ctx: Context, osuid: int=None):
 
 
 @bot.command(aliases=('profile', 'p'), help='displays a profile card for an osu account (default yours)')
-async def osu_profile(ctx: Context, u: str=''):
+async def osu_profile(ctx: Context, u: Optional[str]=''):
     if not u:
         u = get_osuid(ctx)
+    if not u:
+        return await ctx.send('invalid user')
     user = get_user(u)
     await ctx.send(embed=get_user_embed(user))
 
@@ -218,7 +220,7 @@ async def enable_osu_automatic_updates_error(ctx, error):
 @bot.command(aliases=('dt', 'test'), help='command used for testing during development')
 async def dev_test(ctx):
     # set up test data
-    osuid = 17626463
+    osuid = '17626463'
     r = json.load(open('test.json', 'r'))
     updateEmbed = Embed(
         title=f'osu!track update for {r["username"]}',
@@ -292,7 +294,7 @@ def get_user_embed(user: osu.User) -> Embed:
     )
     userEmbed.add_field(
         name='Hit Accuracy',
-        value=round(float(user["accuracy"]), 2),
+        value=f'{round(float(user["accuracy"]), 2)}%',
         inline=True,
     )
     userEmbed.add_field(
@@ -336,21 +338,18 @@ def write_user_data(uid: str, data: Dict={}, truncate: bool=False) -> None:
         json.dump(allData, fp, sort_keys=True, indent=4)
 
 
-def read_user_data(uid: str, key: str=''):
+def read_user_data(uid: str, key: str) -> Optional[str]:
     with open(USER_DATA, "r") as fp:
         allData = json.load(fp)
     userData = allData[f'{uid}'] if f'{uid}' in allData else {}
-    if key:
-        return userData[key] if key in userData else None
-    else:
-        return userData
+    return userData[key] if key in userData else None
 
 
 def get_osuid(ctx: Context) -> Optional[str]:
     return read_user_data(ctx.author.id, 'osuid')
 
 
-def get_all_osuid() -> List[str]:
+def get_all_osuid() -> List[Tuple[str, str]]:
     with open(USER_DATA, "r") as fp:
         allData = json.load(fp)
         return [(uid, allData[uid]['osuid']) for uid in allData if 'osuid' in allData[uid]]

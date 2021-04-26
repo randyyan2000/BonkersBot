@@ -138,6 +138,9 @@ def mod_string(modnum, nm='NM'):
         return nm
 
 
+def update_score_difficulty(score: Score):
+    pass
+
 def profile_thumb(osuid: str) -> str:
     return f'http://s.ppy.sh/a/{osuid}'
 
