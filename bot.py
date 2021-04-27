@@ -37,6 +37,7 @@ SADGE_EMOTE = '<:Sadge:805178964652982282>'
 OSU_SCORE_EMOJI_MAP: Mapping[osu.ScoreRank, str] = {
     'XH': '<:osuXH:835607165279797269>',
     'SSH': '<:osuXH:835607165279797269>',
+    'X': '<:osuSS:835607691787239435>',
     'SS': '<:osuSS:835607691787239435>',
     'SH': '<:osuSH:835607165653745684>',
     'S' : '<:osuS:835607691790647327>',
@@ -170,7 +171,7 @@ async def osu_profile(ctx: Context, u: Optional[str]=''):
     await ctx.send(embed=get_user_embed(user))
 
 
-@tasks.loop(hours=1)
+@tasks.loop(minutes=10)
 async def osu_auto_update():
     channel = bot.get_channel(AUTO_UPDATE_CHANNEL_ID)
     allRecentTopScores = {}
@@ -180,20 +181,21 @@ async def osu_auto_update():
         recentTopScores = list(filter(is_recent_score, topScores))
         if len(recentTopScores):
             allRecentTopScores[(uid, osuid)] = recentTopScores
-
+    print(f'Top score update for {dt.datetime.now()}')
     if len(allRecentTopScores): 
-        await channel.send('New top scores from the past hour 🎉')
+        print(allRecentTopScores)
+        # await channel.send('New top scores from the past hour 🎉')
         for (uid, osuid), scores in allRecentTopScores.items():
             if len(scores):
                 await channel.send(f'New top scores for <@{uid}>')
                 user = get_user(osuid)
                 for score in scores:
                     await channel.send(embed=get_score_embed(score, osuid, user['username']))
-    else:
-        await channel.send(f'No top scores in past hour {SADGE_EMOTE}')
+    # else:
+    #     await channel.send(f'No top scores in past hour {SADGE_EMOTE}')
 
 
-def is_recent_score(score, timedelta=dt.timedelta(hours=1, minutes=1)) -> bool:
+def is_recent_score(score, timedelta=dt.timedelta(minutes=10, seconds=10)) -> bool:
     '''
         Returns True if `score` was submitted within `timedelta` (default 1 day) time before datetime.utcnow() 
     '''

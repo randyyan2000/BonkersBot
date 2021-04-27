@@ -4,7 +4,7 @@ from typing_extensions import Literal
 
 # osu types (mostly mirrors osu api/ameo api documentation) with exceptions commented
 # https://github.com/ppy/osu-api/wiki https://github.com/Ameobea/osutrack-api
-ScoreRank = Literal['D', 'C', 'B', 'A', 'S', 'SH', 'SS', 'XH', 'SSH']
+ScoreRank = Literal['D', 'C', 'B', 'A', 'S', 'SH', 'X', 'SS', 'XH', 'SSH']
 
 
 class Beatmap(TypedDict):
@@ -20,7 +20,7 @@ class Beatmap(TypedDict):
     diff_aim             : float
     diff_speed           : float
     diff_size            : int      # Circle size value (CS)
-    diff_overall         : int      # Overall difficulty (OD)
+    diff_overall         : float    # Overall difficulty (OD)
     diff_approach        : int      # Approach Rate (AR)
     diff_drain           : int      # Health drain (HP)
     hit_length           : int      # seconds from first note to last note not including breaks
@@ -38,7 +38,7 @@ class Beatmap(TypedDict):
     count_normal         : int
     count_slider         : int
     count_spinner        : int
-    max_combo            : int      # The maximum combo a user can reach playing this beatmap.
+    max_combo            : int      # The maximum combo a user can reach playing this beatmap
 
 
 class Score(TypedDict, total=False):
@@ -139,6 +139,7 @@ def mod_string(modnum, nm='NM'):
 
 
 def update_score_difficulty(score: Score):
+
     pass
 
 def profile_thumb(osuid: str) -> str:
