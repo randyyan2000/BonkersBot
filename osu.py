@@ -1,4 +1,4 @@
-from typing import TypedDict
+from typing import TypedDict, Union
 
 from typing_extensions import Literal
 
@@ -41,7 +41,7 @@ class Beatmap(TypedDict):
     max_combo            : int      # The maximum combo a user can reach playing this beatmap
 
 
-class Score(TypedDict, total=False):
+class Score(TypedDict):
     beatmap_id          : str
     score_id            : str
     score               : int
@@ -66,7 +66,7 @@ class Score(TypedDict, total=False):
 
 
 class User(TypedDict):
-    user_id              : int
+    user_id              : str
     username             : str
     join_date            : str      # In UTC
     count300             : int      # Total amount for all ranked, approved, and loved beatmaps played
@@ -148,7 +148,7 @@ def profile_thumb(osuid: str) -> str:
 def profile_link(osuid: str) -> str:
     return f'https://osu.ppy.sh/users/{osuid}'
 
-def beatmap_thumb(beatmapsetid: str) -> str:
+def beatmap_thumb(beatmapsetid: Union[int, str]) -> str:
     return f'https://b.ppy.sh/thumb/{beatmapsetid}l.jpg'
 
 def beatmap_link(beatmapid: str) -> str:

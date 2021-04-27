@@ -1,19 +1,19 @@
 # bot.py
+import datetime as dt
+import json
+import logging
 import os
-
+import time
 from typing import Dict, List, Mapping, Optional, Tuple, Union
 
-from discord.ext import commands, tasks
-from discord import Embed, Color, Emoji
-import requests
-from dotenv import load_dotenv
-import json
-from humanize import naturaltime
 import flag
-import datetime as dt
-import time
+import requests
+from discord import Color, Embed, Emoji
+from discord.ext import commands, tasks
+from dotenv import load_dotenv
+from humanize import naturaltime
+
 import osu
-import logging
 
 logger = logging.getLogger('discord')
 logger.setLevel(logging.DEBUG)
@@ -114,9 +114,10 @@ async def osu_top(ctx: Context, rank: int=1, u: Optional[str]=None):
         u = get_osuid(ctx)
     if not u:
         return ctx.send('invalid user')
-    response = requests.post(f'{OSU_API_ENDPOINT}get_user_best', params={'k': OSU_API_KEY, 'u': u, 'limit': rank})
-    score = response.json()[rank - 1]
-    score['ranking'] = rank - 1
+    topScores = get_top_scores(u=u, limit=rank)
+    if not topScores:
+        return ctx.send(f'No top scores found for user {u}. Make sure to provide a valid osu username/id.')
+    score = topScores[rank - 1]
     user = get_user(u)
     await ctx.send(embed=get_score_embed(score, user['user_id'], user['username']))
 
@@ -130,6 +131,8 @@ async def osu_toprange(ctx: Context, rankstart: int=1, rankend: int=10, u: Optio
     if not u:
         return await ctx.send('invalid user')
     topScores = get_top_scores(u, rankend)
+    if not topScores:
+        return ctx.send(f'No top scores found for user {u}. Make sure to provide a valid osu username/id.')
     scores = topScores[rankstart - 1: rankend]
     user = get_user(u)
 
@@ -147,18 +150,21 @@ async def osu_toprange(ctx: Context, rankstart: int=1, rankend: int=10, u: Optio
 
 
 @bot.command(aliases=('register', 'r'), help='registers an osu account to your discord user and runs an intial osu!track update')
-async def osu_register(ctx: Context, osuid: Optional[str]=None):
-    if not osuid:
-        return await ctx.send('Please specify an osu profile id!')
+async def osu_register(ctx: Context, u: Optional[str]=None):
+    if not u:
+        return await ctx.send('Please specify an osu profile username/id!')
     else:
+        user = get_user(u)
+        if not user:
+            return await ctx.send(f'User {u} not found, you can try using an osu id instead')
         oldid = get_osuid(ctx)
-        if oldid != osuid:
-            write_user_data(ctx.author.id, data={'osuid': osuid})
+        if oldid != user['user_id']:
+            write_user_data(ctx.author.id, data={'osuid': user['user_id']})
             await ctx.message.add_reaction('✅')
-            await ctx.send(f'User 40870022 registered to {reply_mention(ctx)}')
-            await osu_update(ctx, osuid=osuid, showhs=False)
+            await ctx.send(f'User {user["username"]} is now registered to {reply_mention(ctx)}. Here\'s your inital osu!track update')
+            await osu_update(ctx, osuid=user['user_id'], showhs=False)
         else:
-            await ctx.send(f'osu user id {osuid} already registered')
+            await ctx.send(f'osu user **{user["username"]}** is already registered')
 
 
 @bot.command(aliases=('profile', 'p'), help='displays a profile card for an osu account (default yours)')
@@ -166,8 +172,10 @@ async def osu_profile(ctx: Context, u: Optional[str]=''):
     if not u:
         u = get_osuid(ctx)
     if not u:
-        return await ctx.send('invalid user')
+        return await ctx.send('No osu account registered!')
     user = get_user(u)
+    if not user:
+        return await ctx.send(f'User {u} not found, you can try using an osu id instead')
     await ctx.send(embed=get_user_embed(user))
 
 
@@ -399,8 +407,9 @@ def reply_mention(ctx: Context) -> str:
     return f'<@{ctx.author.id}>'
 
 
-def get_user(u: str) -> osu.User:
-    return requests.post(f'{OSU_API_ENDPOINT}get_user', params={'k': OSU_API_KEY, 'u': u}).json()[0]
+def get_user(u: str) -> Optional[osu.User]:
+    response = requests.post(f'{OSU_API_ENDPOINT}get_user', params={'k': OSU_API_KEY, 'u': u}).json()
+    return response[0] if len(response) else None
 
 
 def get_beatmap(beatmapid: str):
