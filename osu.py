@@ -6,7 +6,7 @@ from typing_extensions import Literal
 # https://github.com/ppy/osu-api/wiki https://github.com/Ameobea/osutrack-api
 ScoreRank = Literal['D', 'C', 'B', 'A', 'S', 'SH', 'X', 'SS', 'XH', 'SSH']
 
-
+# fmt: off
 class Beatmap(TypedDict):
     submit_date          : str      # date submitted, in UTC
     approved_date        : str      # date ranked, in UTC
@@ -121,6 +121,8 @@ MODS_ENUM = {
     '2K'  : 268435456,
     'V2'  : 536870912,
 }
+# fmt: on
+
 
 def mod_string(modnum, nm='NM'):
     # e.g. '+HDDT'
@@ -142,14 +144,18 @@ def update_score_difficulty(score: Score):
 
     pass
 
+
 def profile_thumb(osuid: str) -> str:
     return f'http://s.ppy.sh/a/{osuid}'
+
 
 def profile_link(osuid: str) -> str:
     return f'https://osu.ppy.sh/users/{osuid}'
 
+
 def beatmap_thumb(beatmapsetid: Union[int, str]) -> str:
     return f'https://b.ppy.sh/thumb/{beatmapsetid}l.jpg'
+
 
 def beatmap_link(beatmapid: str) -> str:
     return f'https://osu.ppy.sh/b/{beatmapid}'
