@@ -1,7 +1,11 @@
-.env
-env/
-/.vscode
+.vscode/
 __pycache__/
+.env
+
+# venv file
+bonkers/
+
+# bot files
 data.json
 discord.log
 test.json

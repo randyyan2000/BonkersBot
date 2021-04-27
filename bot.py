@@ -4,7 +4,9 @@ import json
 import logging
 import os
 import time
-from typing import Dict, List, Mapping, Optional, Tuple, Union
+from typing import Dict, List, Mapping, Optional, Tuple, Union, cast
+from discord.channel import TextChannel
+from discord.enums import ChannelType
 
 import flag
 import requests
@@ -181,7 +183,14 @@ async def osu_profile(ctx: Context, u: Optional[str]=''):
 
 @tasks.loop(minutes=10)
 async def osu_auto_update():
+    print(f'Running top score update for {dt.datetime.now()}')
     channel = bot.get_channel(AUTO_UPDATE_CHANNEL_ID)
+    if not channel or channel.type != ChannelType.text:
+        print(f'Top score update failed: invalid channel ID {AUTO_UPDATE_CHANNEL_ID}')
+        logging.error(f'Top score update failed: invalid channel ID {AUTO_UPDATE_CHANNEL_ID}')
+        return
+    channel = cast(TextChannel, channel)
+
     allRecentTopScores = {}
     osuids = get_all_osuid()
     for uid, osuid in osuids:
@@ -189,7 +198,6 @@ async def osu_auto_update():
         recentTopScores = list(filter(is_recent_score, topScores))
         if len(recentTopScores):
             allRecentTopScores[(uid, osuid)] = recentTopScores
-    print(f'Top score update for {dt.datetime.now()}')
     if len(allRecentTopScores): 
         print(allRecentTopScores)
         # await channel.send('New top scores from the past hour 🎉')
@@ -294,12 +302,12 @@ def get_user_embed(user: osu.User) -> Embed:
     )
     userEmbed.add_field(
         name='Ranked Score',
-        value=user["ranked_score"],
+        value=f'{user["ranked_score"]}',
         inline=True
     )
     userEmbed.add_field(
         name='Total score',
-        value=user["total_score"],
+        value=f'{user["total_score"]}',
         inline=True,
     )
     userEmbed.add_field(
@@ -309,7 +317,7 @@ def get_user_embed(user: osu.User) -> Embed:
     )
     userEmbed.add_field(
         name='Play Count',
-        value=user["playcount"],
+        value=f'{user["playcount"]}',
         inline=True,
     )
     userEmbed.add_field(
@@ -319,7 +327,7 @@ def get_user_embed(user: osu.User) -> Embed:
     )
     userEmbed.add_field(
         name='Level',
-        value=user["level"],
+        value=f'{user["level"]}',
         inline=True,
     )
     userEmbed.add_field(
@@ -335,7 +343,7 @@ def get_user_embed(user: osu.User) -> Embed:
     return userEmbed
 
 
-def write_user_data(uid: str, data: Dict={}, truncate: bool=False) -> None:
+def write_user_data(uid: Union[int, str], data: Dict={}, truncate: bool=False) -> None:
     with open(USER_DATA, "r") as fp:
         allData = json.load(fp)
     userData = allData[f'{uid}'] if f'{uid}' in allData else {}
@@ -348,7 +356,7 @@ def write_user_data(uid: str, data: Dict={}, truncate: bool=False) -> None:
         json.dump(allData, fp, sort_keys=True, indent=4)
 
 
-def read_user_data(uid: str, key: str) -> Optional[str]:
+def read_user_data(uid: Union[int, str], key: str) -> Optional[str]:
     with open(USER_DATA, "r") as fp:
         allData = json.load(fp)
     userData = allData[f'{uid}'] if f'{uid}' in allData else {}
@@ -425,16 +433,18 @@ def get_top_scores(u: str, limit: int) -> List[osu.Score]:
 
 def get_score_acc(score: osu.Score):
     countmiss, count50, count100, count300 = int(score["countmiss"]), int(score["count50"]), int(score["count100"]), int(score["count300"])
-    acc = (count50 + 2 * count100 + 6 * count300) / (countmiss + count50 + count100 + count300) / 6 * 100 # see https://osu.ppy.sh/wiki/en/Accuracy
+    # see https://osu.ppy.sh/wiki/en/Accuracy
+    acc = (count50 + 2 * count100 + 6 * count300) / (countmiss + count50 + count100 + count300) / 6 * 100
     return round(acc, 2)
 
 
 def get_score_timedelta(score: osu.Score) -> dt.timedelta:
-    return naturaltime(dt.datetime.utcnow() - dt.datetime.fromisoformat(score['date']))
+    return cast(dt.timedelta, naturaltime(dt.timedelta, dt.datetime.utcnow() - dt.datetime.fromisoformat(score['date'])))
 
 
 def osu_score_emoji(rank: osu.ScoreRank) -> Union[Emoji, str]:
     return OSU_SCORE_EMOJI_MAP[rank] if rank in OSU_SCORE_EMOJI_MAP else f'**{rank}**'
 
-
+if not TOKEN:
+    raise Exception('no discord bot token DISCORD_TOKEN provided in .env file')
 bot.run(TOKEN)
