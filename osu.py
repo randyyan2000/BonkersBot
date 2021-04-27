@@ -153,6 +153,10 @@ def profile_link(osuid: str) -> str:
     return f'https://osu.ppy.sh/users/{osuid}'
 
 
+def track_profile_link(username: str) -> str:
+    return f'https://ameobea.me/osutrack/user/{username}'
+
+
 def beatmap_thumb(beatmapsetid: Union[int, str]) -> str:
     return f'https://b.ppy.sh/thumb/{beatmapsetid}l.jpg'
 

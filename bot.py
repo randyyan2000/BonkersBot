@@ -87,18 +87,21 @@ async def osu_update(ctx: Context, osuid: Optional[str] = None, showhs: bool = T
     if response.status_code != 200:
         if response.status_code == 400:
             return await ctx.send(f'Invalid update request, please make sure a valid user id was given/registered.')
-        return await ctx.send('Something went wrong :(')
-    print(response.text)
+        else:
+            return await ctx.send('Something went wrong :(')
     r = response.json()
     updateEmbed = Embed(
         title=f'osu!track update for {r["username"]}', type='rich', color=EMBED_COLOR,
-        description=f'[osu! profile]({osu.profile_link(osuid)}) · [osu!track Profile](https://ameobea.me/osutrack/user/{r["username"]})\n\
-        **Rank**: {format_diff(r["pp_rank"])}\n\
-        **PP**: {format_diff(round(r["pp_raw"], 4))}\n\
-        **Playcount**: {r["playcount"]}\n\
-        **Acc**: {format_diff(round(r["accuracy"], 2))}\n\n\
-        **New Highscores**: {len(r["newhs"])}{f" {KEKW_EMOTE}" if len(r["newhs"]) == 0 else ""}\n\
-        {chr(10).join(map(format_score_inline, r["newhs"])) if showhs else ""}')
+        description=(
+            f'[osu! profile]({osu.profile_link(osuid)}) · [osu!track profile]({osu.track_profile_link(r["username"])})\n'
+            f'**Rank**: {format_diff(r["pp_rank"])}\n'
+            f'**PP**: {format_diff(round(r["pp_raw"], 4))}\n'
+            f'**Playcount**: {r["playcount"]}\n'
+            f'**Acc**: {format_diff(round(r["accuracy"], 2))}\n\n'
+            f'**New Highscores**: {len(r["newhs"])}{f" {KEKW_EMOTE}" if len(r["newhs"]) == 0 else ""}\n'
+            f'{chr(10).join(map(format_score_inline, r["newhs"])) if showhs else ""}'
+        )
+    )
     updateEmbed.set_thumbnail(url=osu.profile_thumb(osuid))
     await ctx.send(embed=updateEmbed)
     if showhs:
@@ -107,8 +110,8 @@ async def osu_update(ctx: Context, osuid: Optional[str] = None, showhs: bool = T
             await ctx.send(embed=embed)
 
 
-@bot.command(aliases=('t', 'top'),
-             help='$top (<rank=1>) (<username/userid>) gets the top #rank score for a given osu user (defaults to your registered user)')
+@ bot.command(aliases=('t', 'top'),
+              help='$top (<rank=1>) (<username/userid>) gets the top #rank score for a given osu user (defaults to your registered user)')
 async def osu_top(ctx: Context, rank: int = 1, u: Optional[str] = None):
     if rank < 1 or rank > 100:
         return ctx.send('invalid score rank (must be between 1-100)')
@@ -124,8 +127,8 @@ async def osu_top(ctx: Context, rank: int = 1, u: Optional[str] = None):
     await ctx.send(embed=get_score_embed(score, user['user_id'], user['username']))
 
 
-@bot.command(aliases=('tr', 'topr', 'toprange'),
-             help='$toprange (<rankstart=1>) (<rankend=1>) (<username/userid>) gets a range of top scores for a given osu user (defaults to your registered user)')
+@ bot.command(aliases=('tr', 'topr', 'toprange'),
+              help='$toprange (<rankstart=1>) (<rankend=1>) (<username/userid>) gets a range of top scores for a given osu user (defaults to your registered user)')
 async def osu_toprange(ctx: Context, rankstart: int = 1, rankend: int = 10, u: Optional[str] = None):
     if rankstart < 1 or rankend < 1 or rankend > 100 or rankstart > rankend or rankend - rankstart >= 15:
         return await ctx.send('invalid score rank range (max 15 scores, ranks must be between 1-100) ')
@@ -152,8 +155,8 @@ async def osu_toprange(ctx: Context, rankstart: int = 1, rankend: int = 10, u: O
     await ctx.send(embed=toprangeEmbed)
 
 
-@bot.command(aliases=('register', 'r'),
-             help='registers an osu account to your discord user and runs an intial osu!track update')
+@ bot.command(aliases=('register', 'r'),
+              help='registers an osu account to your discord user and runs an intial osu!track update')
 async def osu_register(ctx: Context, u: Optional[str] = None):
     if not u:
         return await ctx.send('Please specify an osu profile username/id!')
@@ -171,7 +174,7 @@ async def osu_register(ctx: Context, u: Optional[str] = None):
             await ctx.send(f'osu user **{user["username"]}** is already registered')
 
 
-@bot.command(aliases=('profile', 'p'), help='displays a profile card for an osu account (default yours)')
+@ bot.command(aliases=('profile', 'p'), help='displays a profile card for an osu account (default yours)')
 async def osu_profile(ctx: Context, u: Optional[str] = ''):
     if not u:
         u = get_osuid(ctx)
@@ -183,7 +186,7 @@ async def osu_profile(ctx: Context, u: Optional[str] = ''):
     await ctx.send(embed=get_user_embed(user))
 
 
-@tasks.loop(minutes=10)
+@ tasks.loop(minutes=10)
 async def osu_auto_update():
     print(f'Running top score update for {dt.datetime.now()}')
     channel = bot.get_channel(AUTO_UPDATE_CHANNEL_ID)
@@ -220,8 +223,8 @@ def is_recent_score(score, timedelta=dt.timedelta(minutes=10, seconds=10)) -> bo
     return dt.datetime.utcnow() - dt.datetime.fromisoformat(score['date']) < timedelta
 
 
-@bot.command(help='enables automatic updates of highscores for registered users')
-@commands.has_permissions(administrator=True)
+@ bot.command(help='enables automatic updates of highscores for registered users')
+@ commands.has_permissions(administrator=True)
 async def enable_osu_automatic_updates(ctx):
     global AUTO_UPDATE_CHANNEL_ID
     oldUpdateChannelID = AUTO_UPDATE_CHANNEL_ID
@@ -237,26 +240,28 @@ async def enable_osu_automatic_updates(ctx):
     osu_auto_update.start()
 
 
-@enable_osu_automatic_updates.error
+@ enable_osu_automatic_updates.error
 async def enable_osu_automatic_updates_error(ctx, error):
     await ctx.send('You must be an admin to enable automatic top score updates')
 
 
-@bot.command(aliases=('dt', 'test'), help='command used for testing during development')
+@ bot.command(aliases=('dt', 'test'), help='command used for testing during development')
 async def dev_test(ctx):
     # set up test data
     osuid = '17626463'
     r = json.load(open('test.json', 'r'))
     updateEmbed = Embed(
         title=f'osu!track update for {r["username"]}', type='rich', color=EMBED_COLOR,
-        description=f'[osu! profile]({osu.profile_link(osuid)}) · \
-            [osu!track Profile](https://ameobea.me/osutrack/user/{r["username"]})\n\
-        **Rank**: {format_diff(r["pp_rank"])}\n\
-        **PP**: {format_diff(round(r["pp_raw"], 4))}\n\
-        **Playcount**: {r["playcount"]}\n\
-        **Acc**: {format_diff(round(r["accuracy"], 2))}\n\n\
-        **New Highscores**: {len(r["newhs"])}{f" {KEKW_EMOTE}" if len(r["newhs"]) == 0 else ""}\n\
-        {chr(10).join(map(format_score_inline, r["newhs"]))}')
+        description=(
+            f'[osu! profile]({osu.profile_link(osuid)}) · [osu!track profile]({osu.track_profile_link(r["username"])})\n'
+            f'**Rank**: {format_diff(r["pp_rank"])}\n'
+            f'**PP**: {format_diff(round(r["pp_raw"], 4))}\n'
+            f'**Playcount**: {r["playcount"]}\n'
+            f'**Acc**: {format_diff(round(r["accuracy"], 2))}\n\n'
+            f'**New Highscores**: {len(r["newhs"])}{f" {KEKW_EMOTE}" if len(r["newhs"]) == 0 else ""}\n'
+            f'{chr(10).join(map(format_score_inline, r["newhs"]))}'
+        )
+    )
     updateEmbed.set_thumbnail(url=osu.profile_thumb(osuid))
     await ctx.send(embed=updateEmbed)
 
@@ -273,22 +278,26 @@ def get_score_embed(score: osu.Score, osuid: str, username: str) -> Embed:
     scoreEmbed = Embed(
         type='rich',
         color=EMBED_COLOR,
-        description=f'**#{score["ranking"] + 1}: [{title}]({osu.beatmap_link(score["beatmap_id"])})\n\
-        {osu_score_emoji(score["rank"])} | \
-        {osu.mod_string(int(score["enabled_mods"]))} | \
-        {get_score_acc(score)}% ({score["maxcombo"]}/{bmp["max_combo"]}) | \
-        {score["pp"]}pp | \
-        {get_score_timedelta(score)}**',
+        description=(
+            f'**#{score["ranking"] + 1}: [{title}]({osu.beatmap_link(score["beatmap_id"])})\n'
+            f'{osu_score_emoji(score["rank"])} | '
+            f'{osu.mod_string(int(score["enabled_mods"]))} | '
+            f'{get_score_acc(score)}% ({score["maxcombo"]}/{bmp["max_combo"]}) | '
+            f'{score["pp"]}pp | '
+            f'{get_score_timedelta(score)}**'
+        ),
     )
     scoreEmbed.add_field(
         name='Beatmap Info',
-        value=f'Length **{format_seconds(int(bmp["total_length"]))}** ~ \
-            CS**{bmp["diff_size"]}** \
-            AR**{bmp["diff_approach"]}** \
-            OD**{bmp["diff_overall"]}** \
-            HP**{bmp["diff_drain"]}** ~ \
-            **{bmp["bpm"]}** BPM ~ \
-            **{round(float(bmp["difficultyrating"]), 2)}**★',
+        value=(
+            f'Length **{format_seconds(int(bmp["total_length"]))}** ~ '
+            f'CS**{bmp["diff_size"]}** '
+            f'AR**{bmp["diff_approach"]}** '
+            f'OD**{bmp["diff_overall"]}** '
+            f'HP**{bmp["diff_drain"]}** ~ '
+            f'**{bmp["bpm"]}** BPM ~ '
+            f'**{round(float(bmp["difficultyrating"]), 2)}**★'
+        ),
         inline=False
     )
     authortitle = f'{username} - #{score["ranking"] + 1} Top Play' if 'ranking' in score else username
@@ -300,9 +309,11 @@ def get_score_embed(score: osu.Score, osuid: str, username: str) -> Embed:
 def get_user_embed(user: osu.User) -> Embed:
     osuid = user['user_id']
     userEmbed = Embed(
-        title=f'{flag(user["country"])} {user["username"]} - {user["pp_raw"]}pp \
-            (#{user["pp_rank"]}) \
-            ({user["country"]} #{user["pp_country_rank"]})',
+        title=(
+            f'{flag(user["country"])} {user["username"]} - {user["pp_raw"]}pp | '
+            f'#{user["pp_rank"]} | '
+            f'{user["country"]} #{user["pp_country_rank"]}'
+        ),
         url=osu.profile_link(osuid),
         type='rich',
         color=EMBED_COLOR,
@@ -339,11 +350,13 @@ def get_user_embed(user: osu.User) -> Embed:
     )
     userEmbed.add_field(
         name='Grades',
-        value=f'{osu_score_emoji("XH")} {user["count_rank_ssh"]}  \t\
-            {osu_score_emoji("SS")} {user["count_rank_ss"]}  \t\
-            {osu_score_emoji("SH")} {user["count_rank_sh"]}  \t\
-            {osu_score_emoji("S")} {user["count_rank_s"]}  \t\
-            {osu_score_emoji("A")} {user["count_rank_a"]}',
+        value=(
+            f'{osu_score_emoji("XH")} \u200b {user["count_rank_ssh"]} \u200b '
+            f'{osu_score_emoji("SS")} \u200b {user["count_rank_ss"]} \u200b '
+            f'{osu_score_emoji("SH")} \u200b {user["count_rank_sh"]} \u200b '
+            f'{osu_score_emoji("S")} \u200b {user["count_rank_s"]} \u200b '
+            f'{osu_score_emoji("A")} \u200b {user["count_rank_a"]}'
+        ),
         inline=False,
     )
     userEmbed.set_thumbnail(url=osu.profile_thumb(osuid))
@@ -454,7 +467,7 @@ def get_score_acc(score: osu.Score):
 
 
 def get_score_timedelta(score: osu.Score) -> str:
-    return cast(str, naturaltime(dt.timedelta, dt.datetime.utcnow() - dt.datetime.fromisoformat(score['date'])))
+    return cast(str, naturaltime(dt.datetime.utcnow() - dt.datetime.fromisoformat(score['date'])))
 
 
 def osu_score_emoji(rank: osu.ScoreRank) -> Union[Emoji, str]:
