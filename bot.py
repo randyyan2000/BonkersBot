@@ -1,17 +1,21 @@
 # bot.py
 import datetime as dt
 import json
+from json.decoder import JSONDecodeError
 import logging
 import os
 import time
 from typing import Dict, List, Mapping, Optional, Tuple, Union, cast
-from discord.channel import TextChannel
-from discord.enums import ChannelType
 
 from flag import flag
 import requests
 from discord import Color, Embed, Emoji
+from discord.activity import Game
+from discord.channel import TextChannel
+from discord.enums import ChannelType
 from discord.ext import commands, tasks
+from discord.ext.commands.context import Context
+from discord.message import Message
 from dotenv import load_dotenv
 from humanize import naturaltime
 
@@ -23,17 +27,19 @@ handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w'
 handler.setFormatter(logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s'))
 logger.addHandler(handler)
 
+
+# envvars
 load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
 OSU_API_KEY = os.getenv('OSU_API_KEY')
-USER_DATA = os.getenv('USER_DATA_FILE') or 'data.json'
+USER_DATA = os.getenv('USER_DATA_FILE') or 'users.json'
+GUILD_DATA = os.getenv('GUILD_DATA_FILE') or 'guilds.json'
+DEFAULT_PREFIX = os.getenv('DEFAULT_PREFIX') or '$'
 
 AMEO_API_ENDPOINT = 'https://osutrack-api.ameo.dev/'
 OSU_API_ENDPOINT = 'https://osu.ppy.sh/api/'
 
-PREFIX = '$'
 EMBED_COLOR = Color.from_rgb(255, 165, 0)
-
 KEKW_EMOTE = '<:KEKW:805177941814018068>'
 SADGE_EMOTE = '<:Sadge:805178964652982282>'
 OSU_SCORE_EMOJI_MAP: Mapping[osu.ScoreRank, str] = {
@@ -48,12 +54,18 @@ OSU_SCORE_EMOJI_MAP: Mapping[osu.ScoreRank, str] = {
     'C': '<:osuC:835611278172487694>',
 }
 
-# typing setup
-Context = commands.Context
-
 AUTO_UPDATE_CHANNEL_ID: int = 0
 
-bot = commands.Bot(command_prefix=PREFIX)
+
+def get_prefix(bot: commands.Bot, message: Message):
+    prefix = DEFAULT_PREFIX
+    guild = message.guild
+    if guild:
+        prefix = read_guild_data(guild.id, 'prefix')
+    return prefix if prefix else DEFAULT_PREFIX
+
+
+bot = commands.Bot(command_prefix=get_prefix, activity=Game('$help, feel free to @Honkers with any feedback'))
 
 
 @bot.event
@@ -114,14 +126,14 @@ async def osu_update(ctx: Context, osuid: Optional[str] = None, showhs: bool = T
               help='$top (<rank=1>) (<username/userid>) gets the top #rank score for a given osu user (defaults to your registered user)')
 async def osu_top(ctx: Context, rank: int = 1, u: Optional[str] = None):
     if rank < 1 or rank > 100:
-        return ctx.send('invalid score rank (must be between 1-100)')
+        return await ctx.send('invalid score rank (must be between 1-100)')
     if not u:
         u = get_osuid(ctx)
     if not u:
-        return ctx.send('invalid user')
+        return await ctx.send('invalid user')
     topScores = get_top_scores(u=u, limit=rank)
     if not topScores:
-        return ctx.send(f'No top scores found for user {u}. Make sure to provide a valid osu username/id.')
+        return await ctx.send(f'No top scores found for user {u}. Make sure to provide a valid osu username/id.')
     score = topScores[rank - 1]
     user = get_user(u)
     await ctx.send(embed=get_score_embed(score, user['user_id'], user['username']))
@@ -138,7 +150,7 @@ async def osu_toprange(ctx: Context, rankstart: int = 1, rankend: int = 10, u: O
         return await ctx.send('invalid user')
     topScores = get_top_scores(u, rankend)
     if not topScores:
-        return ctx.send(f'No top scores found for user {u}. Make sure to provide a valid osu username/id.')
+        return await ctx.send(f'No top scores found for user {u}. Make sure to provide a valid osu username/id.')
     scores = topScores[rankstart - 1: rankend]
     user = get_user(u)
 
@@ -223,6 +235,19 @@ def is_recent_score(score, timedelta=dt.timedelta(minutes=10, seconds=10)) -> bo
     return dt.datetime.utcnow() - dt.datetime.fromisoformat(score['date']) < timedelta
 
 
+@bot.command(help='changes the prefix for commands to be recognized by Bonkers')
+@ commands.has_permissions(administrator=True)
+async def set_bonkers_prefix(ctx: Context, prefix: str):
+    if not ctx.guild:
+        return await ctx.send('Can\'t change prefix outside a server')
+    if prefix:
+        write_guild_data(ctx.guild.id, {'prefix': prefix})
+        await ctx.message.add_reaction('✅')
+        await ctx.send(f'Bonkers will now respond to commands prefixed with {prefix}')
+    else:
+        await ctx.send('No prefix specified!')
+
+
 @ bot.command(help='enables automatic updates of highscores for registered users')
 @ commands.has_permissions(administrator=True)
 async def enable_osu_automatic_updates(ctx):
@@ -232,7 +257,7 @@ async def enable_osu_automatic_updates(ctx):
     await ctx.message.add_reaction('✅')
     if oldUpdateChannelID:
         osu_auto_update.stop()
-        ctx.send(
+        await ctx.send(
             f'Bonkers will now automatically send top scores in <#{ctx.channel.id}> instead of <#{oldUpdateChannelID}>'
         )
     else:
@@ -246,6 +271,7 @@ async def enable_osu_automatic_updates_error(ctx, error):
 
 
 @ bot.command(aliases=('dt', 'test'), help='command used for testing during development')
+@ commands.has_permissions(administrator=True)
 async def dev_test(ctx):
     # set up test data
     osuid = '17626463'
@@ -363,24 +389,67 @@ def get_user_embed(user: osu.User) -> Embed:
     return userEmbed
 
 
-def write_user_data(uid: Union[int, str], data: Dict = {}, truncate: bool = False) -> None:
-    with open(USER_DATA, "r") as fp:
-        allData = json.load(fp)
-    userData = allData[f'{uid}'] if f'{uid}' in allData else {}
+def write_data(filename: str, id: Union[int, str], data: Dict = {}, truncate: bool = False) -> None:
+    with open(filename, "a+") as fp:
+        try:
+            fp.seek(0)
+            allData = json.load(fp)
+        except JSONDecodeError:
+            if os.path.getsize(filename):
+                # issue with json file, dump contents and rewrite
+                fp.seek(0)
+                contents = fp.read()
+                logging.log(
+                    logging.CRITICAL,
+                    f'Corrupted data for file {filename}. Contents: {contents}', extra={'contents': contents}
+                )
+            else:
+                # just an empty file, start with a fresh dict
+                pass
+            allData = {}
+    userData = allData[f'{id}'] if f'{id}' in allData else {}
     if truncate:
         userData = data
     else:
         userData.update(data)
-    allData[f'{uid}'] = userData
-    with open(USER_DATA, "w+") as fp:
+    allData[f'{id}'] = userData
+    with open(filename, "w+") as fp:
         json.dump(allData, fp, sort_keys=True, indent=4)
 
 
-def read_user_data(uid: Union[int, str], key: str) -> Optional[str]:
-    with open(USER_DATA, "r") as fp:
-        allData = json.load(fp)
-    userData = allData[f'{uid}'] if f'{uid}' in allData else {}
+def write_user_data(uid: Union[int, str], data: Dict = {}, truncate: bool = False) -> None:
+    write_data(USER_DATA, uid, data, truncate)
+
+
+def write_guild_data(gid: Union[int, str], data: Dict = {}, truncate: bool = False) -> None:
+    write_data(GUILD_DATA, gid, data, truncate)
+
+
+def read_data(filename: str, id: Union[int, str], key: str) -> Optional[str]:
+    with open(filename, "a+") as fp:
+        try:
+            fp.seek(0)
+            allData = json.load(fp)
+        except JSONDecodeError as e:
+            if os.path.getsize(filename):
+                # issue with json file, dump contents and rewrite
+                fp.seek(0)
+                contents = fp.read()
+                logging.log(logging.CRITICAL, f'Corrupted data for file {filename}! File contents: {contents}')
+            else:
+                logging.log(logging.WARNING, f'File empty: {filename}')
+                pass
+            allData = {}
+    userData = allData[f'{id}'] if f'{id}' in allData else {}
     return userData[key] if key in userData else None
+
+
+def read_user_data(uid: Union[int, str], key: str) -> Optional[str]:
+    return read_data(USER_DATA, uid, key)
+
+
+def read_guild_data(gid: Union[int, str], key: str) -> Optional[str]:
+    return read_data(GUILD_DATA, gid, key)
 
 
 def get_osuid(ctx: Context) -> Optional[str]:

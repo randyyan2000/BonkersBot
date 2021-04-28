@@ -6,6 +6,8 @@ __pycache__/
 bonkers/
 
 # bot files
-data.json
-discord.log
+users.json
+guilds.json
+backup.json
 test.json
+discord.log
