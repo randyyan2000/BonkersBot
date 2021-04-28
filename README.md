@@ -1,5 +1,5 @@
-My first attempt at making discord bot
+My first attempt at making discord bot :D
 
 To be used personally (and maybe by a few friends) to track new scores for osu
 
-Planning to use Ameo's [osu!track](https://github.com/Ameobea/osutrack-api) api for updates and potentially osu v1 API for getting beatmapset_id for thumbnails, titles, diff names for more descriptive embeds.
+Using Ameo's [osu!track](https://github.com/Ameobea/osutrack-api) api for updates and also osu v1 api for getting beatmap, score, and user data.
