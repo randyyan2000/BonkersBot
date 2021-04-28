@@ -87,7 +87,7 @@ async def bonk(ctx: Context):
 
 
 @bot.command(aliases=('update', 'u'),
-             help='runs an osu!track update for your registered profile (see $register) or an explicitly specified uid $update `<uid>`')
+             help='Runs an osu!track update for your registered profile (see $register) or an explicitly specified uid $update `<uid>`')
 async def osu_update(ctx: Context, osuid: Optional[str] = None, showhs: bool = True):
     if not osuid:
         osuid = get_osuid(ctx)
@@ -124,7 +124,7 @@ async def osu_update(ctx: Context, osuid: Optional[str] = None, showhs: bool = T
 
 @ bot.command(aliases=('t', 'top'),
               help='$top (<rank=1>) (<username/userid>) gets the top #rank score for a given osu user (defaults to your registered user)')
-async def osu_top(ctx: Context, rank: int = 1, u: Optional[str] = None):
+async def osu_top(ctx: Context, rank: int = 1, *, u: Optional[str] = None):
     if rank < 1 or rank > 100:
         return await ctx.send('invalid score rank (must be between 1-100)')
     if not u:
@@ -141,7 +141,7 @@ async def osu_top(ctx: Context, rank: int = 1, u: Optional[str] = None):
 
 @ bot.command(aliases=('tr', 'topr', 'toprange'),
               help='$toprange (<rankstart=1>) (<rankend=1>) (<username/userid>) gets a range of top scores for a given osu user (defaults to your registered user)')
-async def osu_toprange(ctx: Context, rankstart: int = 1, rankend: int = 10, u: Optional[str] = None):
+async def osu_toprange(ctx: Context, rankstart: int = 1, rankend: int = 10, *, u: Optional[str] = None):
     if rankstart < 1 or rankend < 1 or rankend > 100 or rankstart > rankend or rankend - rankstart >= 15:
         return await ctx.send('invalid score rank range (max 15 scores, ranks must be between 1-100) ')
     if not u:
@@ -168,8 +168,8 @@ async def osu_toprange(ctx: Context, rankstart: int = 1, rankend: int = 10, u: O
 
 
 @ bot.command(aliases=('register', 'r'),
-              help='registers an osu account to your discord user and runs an intial osu!track update')
-async def osu_register(ctx: Context, u: Optional[str] = None):
+              help='Registers an osu account to your discord user and runs an intial osu!track update')
+async def osu_register(ctx: Context, *, u: Optional[str] = None):
     if not u:
         return await ctx.send('Please specify an osu profile username/id!')
     else:
@@ -186,8 +186,8 @@ async def osu_register(ctx: Context, u: Optional[str] = None):
             await ctx.send(f'osu user **{user["username"]}** is already registered')
 
 
-@ bot.command(aliases=('profile', 'p'), help='displays a profile card for an osu account (default yours)')
-async def osu_profile(ctx: Context, u: Optional[str] = ''):
+@ bot.command(aliases=('profile', 'p'), help='Displays a profile card for an osu account (default yours)')
+async def osu_profile(ctx: Context, *, u: Optional[str] = ''):
     if not u:
         u = get_osuid(ctx)
     if not u:
@@ -200,7 +200,7 @@ async def osu_profile(ctx: Context, u: Optional[str] = ''):
 
 @ tasks.loop(minutes=10)
 async def osu_auto_update():
-    print(f'Running top score update for {dt.datetime.now()}')
+    logging.debug(f'Running top score update for {dt.datetime.now()}')
     channel = bot.get_channel(AUTO_UPDATE_CHANNEL_ID)
     if not channel or channel.type != ChannelType.text:
         print(f'Top score update failed: invalid channel ID {AUTO_UPDATE_CHANNEL_ID}')
@@ -235,7 +235,7 @@ def is_recent_score(score, timedelta=dt.timedelta(minutes=10, seconds=10)) -> bo
     return dt.datetime.utcnow() - dt.datetime.fromisoformat(score['date']) < timedelta
 
 
-@bot.command(help='changes the prefix for commands to be recognized by Bonkers')
+@bot.command(help='Changes the prefix for commands to be recognized by Bonkers')
 @ commands.has_permissions(administrator=True)
 async def set_bonkers_prefix(ctx: Context, prefix: str):
     if not ctx.guild:
@@ -248,12 +248,19 @@ async def set_bonkers_prefix(ctx: Context, prefix: str):
         await ctx.send('No prefix specified!')
 
 
-@ bot.command(help='enables automatic updates of highscores for registered users')
-@ commands.has_permissions(administrator=True)
-async def enable_osu_automatic_updates(ctx):
+@ set_bonkers_prefix.error
+async def set_bonkers_prefix_error(ctx: Context, error):
+    await ctx.send('You must be an admin to enable automatic top score updates')
+
+
+@ bot.command(aliases=('enable_osu_auto_update', 'osu_auto_update', 'eoau'),
+              help='Enables automatic updates of highscores for registered users')
+# @ commands.has_permissions(administrator=True)
+async def enable_osu_automatic_updates(ctx: Context):
     global AUTO_UPDATE_CHANNEL_ID
     oldUpdateChannelID = AUTO_UPDATE_CHANNEL_ID
     AUTO_UPDATE_CHANNEL_ID = ctx.channel.id
+    write_guild_data(ctx.guild.id, data={'osu_update_channel': AUTO_UPDATE_CHANNEL_ID})
     await ctx.message.add_reaction('✅')
     if oldUpdateChannelID:
         osu_auto_update.stop()
@@ -266,11 +273,11 @@ async def enable_osu_automatic_updates(ctx):
 
 
 @ enable_osu_automatic_updates.error
-async def enable_osu_automatic_updates_error(ctx, error):
+async def enable_osu_automatic_updates_error(ctx: Context, error):
     await ctx.send('You must be an admin to enable automatic top score updates')
 
 
-@ bot.command(aliases=('dt', 'test'), help='command used for testing during development')
+@ bot.command(aliases=('dt', 'test'), help='Super secret command used for testing during development')
 @ commands.has_permissions(administrator=True)
 async def dev_test(ctx):
     # set up test data
@@ -399,8 +406,7 @@ def write_data(filename: str, id: Union[int, str], data: Dict = {}, truncate: bo
                 # issue with json file, dump contents and rewrite
                 fp.seek(0)
                 contents = fp.read()
-                logging.log(
-                    logging.CRITICAL,
+                logging.critical(
                     f'Corrupted data for file {filename}. Contents: {contents}', extra={'contents': contents}
                 )
             else:
