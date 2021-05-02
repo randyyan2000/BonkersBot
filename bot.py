@@ -88,13 +88,15 @@ async def bonk(ctx: Context):
 
 @bot.command(aliases=('update', 'u'),
              help='Runs an osu!track update for your registered profile (see $register) or an explicitly specified uid $update `<uid>`')
-async def osu_update(ctx: Context, osuid: Optional[str] = None, showhs: bool = True):
-    if not osuid:
-        osuid = get_osuid(ctx)
-
-    if not osuid:
+async def osu_update(ctx: Context, *, u: Optional[str] = None, showhs: bool = True):
+    if not u:
+        u = get_osuid(ctx)
+    if not u:
         return await ctx.send(f'No osu profile set for user {reply_mention(ctx)}. You can register your osu profile using the $register command or specify an osu user id to update directly with $update <uid>.')
-
+    user = get_user(u)
+    if not user:
+        return await ctx.send(f'invalid user')
+    osuid = user['user_id']
     response = requests.post(f'{AMEO_API_ENDPOINT}update', params={'user': osuid, 'mode': 0})
     if response.status_code != 200:
         if response.status_code == 400:
@@ -117,7 +119,7 @@ async def osu_update(ctx: Context, osuid: Optional[str] = None, showhs: bool = T
     updateEmbed.set_thumbnail(url=osu.profile_thumb(osuid))
     await ctx.send(embed=updateEmbed)
     if showhs:
-        hsEmbeds = [get_score_embed(hs, osuid, r["username"]) for hs in r["newhs"]]
+        hsEmbeds = [get_score_embed(hs, osuid, r["username"]) for hs in r["newhs"][:5]]
         for embed in hsEmbeds:
             await ctx.send(embed=embed)
 

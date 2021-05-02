@@ -1,4 +1,5 @@
 from typing import TypedDict, Union
+from urllib.parse import quote
 
 from typing_extensions import Literal
 
@@ -141,7 +142,6 @@ def mod_string(modnum, nm='NM'):
 
 
 def update_score_difficulty(score: Score):
-
     pass
 
 
@@ -154,7 +154,7 @@ def profile_link(osuid: str) -> str:
 
 
 def track_profile_link(username: str) -> str:
-    return f'https://ameobea.me/osutrack/user/{username}'
+    return f'https://ameobea.me/osutrack/user/{quote(username)}'
 
 
 def beatmap_thumb(beatmapsetid: Union[int, str]) -> str:
