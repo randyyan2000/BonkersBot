@@ -20,6 +20,7 @@ from dotenv import load_dotenv
 from humanize import naturaltime
 
 import osu
+import backend
 
 logger = logging.getLogger('discord')
 logger.setLevel(logging.DEBUG)
@@ -32,8 +33,6 @@ logger.addHandler(handler)
 load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
 OSU_API_KEY = os.getenv('OSU_API_KEY')
-USER_DATA = os.getenv('USER_DATA_FILE') or 'users.json'
-GUILD_DATA = os.getenv('GUILD_DATA_FILE') or 'guilds.json'
 DEFAULT_PREFIX = os.getenv('DEFAULT_PREFIX') or '$'
 
 AMEO_API_ENDPOINT = 'https://osutrack-api.ameo.dev/'
@@ -61,11 +60,14 @@ def get_prefix(bot: commands.Bot, message: Message):
     prefix = DEFAULT_PREFIX
     guild = message.guild
     if guild:
-        prefix = read_guild_data(guild.id, 'prefix')
+        prefix = backend.read_guild_data(guild.id, 'prefix')
     return prefix if prefix else DEFAULT_PREFIX
 
 
-bot = commands.Bot(command_prefix=get_prefix, activity=Game('$help, feel free to @Honkers with any feedback'))
+bot = commands.Bot(
+    command_prefix=get_prefix,
+    activity=Game('$help, feel free to @Honkers with any feedback'),
+)
 
 
 @bot.event
@@ -80,9 +82,9 @@ async def hello(ctx: Context):
 
 @bot.command(help='Bonk the bonkers')
 async def bonk(ctx: Context):
-    bonks = int(read_user_data(ctx.author.id, 'bonks') or 0)
+    bonks = backend.read_user_data(ctx.author.id, 'bonks') or 0
     bonks += 1
-    write_user_data(ctx.author.id, data={'bonks': bonks})
+    backend.write_user_data(ctx.author.id, data={'bonks': bonks})
     await ctx.send(f'Boop. {reply_mention(ctx)} has bonked the bonkers {bonks} time{"" if bonks == 1 else "s"}')
 
 
@@ -178,14 +180,19 @@ async def osu_register(ctx: Context, *, u: Optional[str] = None):
         user = get_user(u)
         if not user:
             return await ctx.send(f'User {u} not found, you can try using an osu id instead')
-        oldid = get_osuid(ctx)
-        if oldid != user['user_id']:
-            write_user_data(ctx.author.id, data={'osuid': user['user_id']})
-            await ctx.message.add_reaction('✅')
-            await ctx.send(f'User {user["username"]} is now registered to {reply_mention(ctx)}. Here\'s your inital osu!track update')
-            await osu_update(ctx, osuid=user['user_id'], showhs=False)
-        else:
-            await ctx.send(f'osu user **{user["username"]}** is already registered')
+
+        registeredGuilds = set(backend.read_user_data(ctx.author.id, 'guilds') or [])
+        registeredGuilds.add(ctx.guild.id)
+        backend.write_user_data(
+            ctx.author.id,
+            data={
+                'osuid': user['user_id'],
+                'guilds': list(registeredGuilds),
+            },
+        )
+        await ctx.message.add_reaction('✅')
+        await ctx.send(f'User {user["username"]} is now registered to {reply_mention(ctx)}. Here\'s your inital osu!track update')
+        await osu_update(ctx, u=user['user_id'], showhs=False)
 
 
 @ bot.command(aliases=('profile', 'p'), help='Displays a profile card for an osu account (default yours)')
@@ -202,32 +209,57 @@ async def osu_profile(ctx: Context, *, u: Optional[str] = ''):
 
 @ tasks.loop(minutes=10)
 async def osu_auto_update():
-    logging.debug(f'Running top score update for {dt.datetime.now()}')
-    channel = bot.get_channel(AUTO_UPDATE_CHANNEL_ID)
-    if not channel or channel.type != ChannelType.text:
-        print(f'Top score update failed: invalid channel ID {AUTO_UPDATE_CHANNEL_ID}')
-        logging.error(f'Top score update failed: invalid channel ID {AUTO_UPDATE_CHANNEL_ID}')
-        return
-    channel = cast(TextChannel, channel)
+    print(f'Running top score update for {dt.datetime.now()}')
+    logger.debug(f'Running top score update for {dt.datetime.now()}')
 
-    allRecentTopScores = {}
-    osuids = get_all_osuid()
-    for uid, osuid in osuids:
+    # allRecentTopScores = {}
+    userData = backend.read_all_data(backend.USER_DATA)
+    guildData = backend.read_all_data(backend.GUILD_DATA)
+
+    for uid, userData in userData.items():
+        if 'osuid' not in userData or 'guilds' not in userData:
+            continue
+        registeredGuilds = userData['guilds']
+        if not len(registeredGuilds):
+            continue
+        osuid = userData['osuid']
         topScores = get_top_scores(u=osuid, limit=100)
         recentTopScores = list(filter(is_recent_score, topScores))
+        # if len(recentTopScores):
+        #     allRecentTopScores[(uid, osuid)] = recentTopScores
         if len(recentTopScores):
-            allRecentTopScores[(uid, osuid)] = recentTopScores
-    if len(allRecentTopScores):
-        print(allRecentTopScores)
-        # await channel.send('New top scores from the past hour 🎉')
-        for (uid, osuid), scores in allRecentTopScores.items():
-            if len(scores):
+            for gid in registeredGuilds:
+                cid = guildData.get(str(gid), {}).get('osu_update_channel')
+                if not cid:
+                    continue
+                channel = bot.get_channel(cid)
+                if not channel or channel.type != ChannelType.text:
+                    print(f'Top score update failed: invalid channel ID {cid}')
+                    logger.error(f'Top score update failed: invalid channel ID {cid}')
+                    continue
+                channel = cast(TextChannel, channel)
                 await channel.send(f'New top scores for <@{uid}>')
                 user = get_user(osuid)
-                for score in scores:
+                for score in recentTopScores:
                     await channel.send(embed=get_score_embed(score, osuid, user['username']))
+
+    # if len(allRecentTopScores):
+    #     print(allRecentTopScores)
+    #     # await channel.send('New top scores from the past hour 🎉')
+    #     for (uid, osuid), scores in allRecentTopScores.items():
+    #         if len(scores):
+    #             await channel.send(f'New top scores for <@{uid}>')
+    #             user = get_user(osuid)
+    #             for score in scores:
+    #                 await channel.send(embed=get_score_embed(score, osuid, user['username']))
     # else:
     #     await channel.send(f'No top scores in past hour {SADGE_EMOTE}')
+
+
+@osu_auto_update.before_loop
+async def before_osu_auto_update():
+    print('waiting for bot to log on')
+    await bot.wait_until_ready()  # wait until the bot logs on
 
 
 def is_recent_score(score, timedelta=dt.timedelta(minutes=10, seconds=10)) -> bool:
@@ -238,12 +270,12 @@ def is_recent_score(score, timedelta=dt.timedelta(minutes=10, seconds=10)) -> bo
 
 
 @bot.command(help='Changes the prefix for commands to be recognized by Bonkers')
-@ commands.has_permissions(administrator=True)
+@commands.has_permissions(administrator=True)
 async def set_bonkers_prefix(ctx: Context, prefix: str):
     if not ctx.guild:
         return await ctx.send('Can\'t change prefix outside a server')
     if prefix:
-        write_guild_data(ctx.guild.id, {'prefix': prefix})
+        backend.write_guild_data(ctx.guild.id, {'prefix': prefix})
         await ctx.message.add_reaction('✅')
         await ctx.send(f'Bonkers will now respond to commands prefixed with {prefix}')
     else:
@@ -255,6 +287,27 @@ async def set_bonkers_prefix_error(ctx: Context, error):
     await ctx.send('You must be an admin to enable automatic top score updates')
 
 
+@bot.command(help='Changes the prefix for commands to be recognized by Bonkers')
+@commands.has_permissions(administrator=True)
+async def osu_unregister(ctx: Context):
+    mentionedIDs = [mention.id for mention in ctx.message.mentions]
+    if not len(mentionedIDs):
+        mentionedIDs.append(ctx.author.id)
+
+    for uid in mentionedIDs:
+        registeredGuilds = backend.read_user_data(uid, 'guilds') or []
+        try:
+            registeredGuilds.remove(ctx.guild.id)
+        except ValueError:
+            pass
+        backend.write_user_data(uid, data={'guilds': registeredGuilds})
+
+    await ctx.message.add_reaction('✅')
+    await ctx.send(
+        f'User(s) {chr(32).join([f"<@{uid}>" for uid in mentionedIDs])} osu account(s) are now unregistered from this server.'
+    )
+
+
 @ bot.command(aliases=('enable_osu_auto_update', 'osu_auto_update', 'eoau'),
               help='Enables automatic updates of highscores for registered users')
 # @ commands.has_permissions(administrator=True)
@@ -262,16 +315,14 @@ async def enable_osu_automatic_updates(ctx: Context):
     global AUTO_UPDATE_CHANNEL_ID
     oldUpdateChannelID = AUTO_UPDATE_CHANNEL_ID
     AUTO_UPDATE_CHANNEL_ID = ctx.channel.id
-    write_guild_data(ctx.guild.id, data={'osu_update_channel': AUTO_UPDATE_CHANNEL_ID})
+    backend.write_guild_data(ctx.guild.id, data={'osu_update_channel': AUTO_UPDATE_CHANNEL_ID})
     await ctx.message.add_reaction('✅')
     if oldUpdateChannelID:
-        osu_auto_update.stop()
         await ctx.send(
             f'Bonkers will now automatically send top scores in <#{ctx.channel.id}> instead of <#{oldUpdateChannelID}>'
         )
     else:
         await ctx.send(f'Bonkers will now automatically send top scores in <#{ctx.channel.id}>')
-    osu_auto_update.start()
 
 
 @ enable_osu_automatic_updates.error
@@ -314,7 +365,7 @@ def get_score_embed(score: osu.Score, osuid: str, username: str) -> Embed:
         type='rich',
         color=EMBED_COLOR,
         description=(
-            f'**#{score["ranking"] + 1}: [{title}]({osu.beatmap_link(score["beatmap_id"])})\n'
+            f'**[{title}]({osu.beatmap_link(score["beatmap_id"])})\n'
             f'{osu_score_emoji(score["rank"])} | '
             f'{osu.mod_string(int(score["enabled_mods"]))} | '
             f'{get_score_acc(score)}% ({score["maxcombo"]}/{bmp["max_combo"]}) | '
@@ -323,7 +374,7 @@ def get_score_embed(score: osu.Score, osuid: str, username: str) -> Embed:
         ),
     )
     scoreEmbed.add_field(
-        name='Beatmap Info',
+        name=f'Beatmap Info ({bmp["beatmap_id"]})',
         value=(
             f'Length **{format_seconds(int(bmp["total_length"]))}** ~ '
             f'CS**{bmp["diff_size"]}** '
@@ -398,76 +449,8 @@ def get_user_embed(user: osu.User) -> Embed:
     return userEmbed
 
 
-def write_data(filename: str, id: Union[int, str], data: Dict = {}, truncate: bool = False) -> None:
-    with open(filename, "a+") as fp:
-        try:
-            fp.seek(0)
-            allData = json.load(fp)
-        except JSONDecodeError:
-            if os.path.getsize(filename):
-                # issue with json file, dump contents and rewrite
-                fp.seek(0)
-                contents = fp.read()
-                logging.critical(
-                    f'Corrupted data for file {filename}. Contents: {contents}', extra={'contents': contents}
-                )
-            else:
-                # just an empty file, start with a fresh dict
-                pass
-            allData = {}
-    userData = allData[f'{id}'] if f'{id}' in allData else {}
-    if truncate:
-        userData = data
-    else:
-        userData.update(data)
-    allData[f'{id}'] = userData
-    with open(filename, "w+") as fp:
-        json.dump(allData, fp, sort_keys=True, indent=4)
-
-
-def write_user_data(uid: Union[int, str], data: Dict = {}, truncate: bool = False) -> None:
-    write_data(USER_DATA, uid, data, truncate)
-
-
-def write_guild_data(gid: Union[int, str], data: Dict = {}, truncate: bool = False) -> None:
-    write_data(GUILD_DATA, gid, data, truncate)
-
-
-def read_data(filename: str, id: Union[int, str], key: str) -> Optional[str]:
-    with open(filename, "a+") as fp:
-        try:
-            fp.seek(0)
-            allData = json.load(fp)
-        except JSONDecodeError as e:
-            if os.path.getsize(filename):
-                # issue with json file, dump contents and rewrite
-                fp.seek(0)
-                contents = fp.read()
-                logging.log(logging.CRITICAL, f'Corrupted data for file {filename}! File contents: {contents}')
-            else:
-                logging.log(logging.WARNING, f'File empty: {filename}')
-                pass
-            allData = {}
-    userData = allData[f'{id}'] if f'{id}' in allData else {}
-    return userData[key] if key in userData else None
-
-
-def read_user_data(uid: Union[int, str], key: str) -> Optional[str]:
-    return read_data(USER_DATA, uid, key)
-
-
-def read_guild_data(gid: Union[int, str], key: str) -> Optional[str]:
-    return read_data(GUILD_DATA, gid, key)
-
-
 def get_osuid(ctx: Context) -> Optional[str]:
-    return read_user_data(ctx.author.id, 'osuid')
-
-
-def get_all_osuid() -> List[Tuple[str, str]]:
-    with open(USER_DATA, "r") as fp:
-        allData = json.load(fp)
-        return [(uid, allData[uid]['osuid']) for uid in allData if 'osuid' in allData[uid]]
+    return backend.read_user_data(ctx.author.id, 'osuid')
 
 
 def format_seconds(seconds: int) -> str:
@@ -553,4 +536,5 @@ def osu_score_emoji(rank: osu.ScoreRank) -> Union[Emoji, str]:
 
 if not TOKEN:
     raise Exception('no discord bot token DISCORD_TOKEN provided in .env file')
+osu_auto_update.start()
 bot.run(TOKEN)
