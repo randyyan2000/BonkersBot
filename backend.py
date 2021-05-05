@@ -1,10 +1,8 @@
 from json.decoder import JSONDecodeError
 import logging
-from typing import Any, Dict, Final, Literal, Mapping, Optional, Type, TypedDict, Union, overload
+from typing import Any, List, Dict, Final, Literal, Optional, TypedDict, Union, overload
 import os
 import json
-
-from discord.guild import Guild
 
 logger = logging.getLogger('discord')
 USER_DATA: Final = 'users.json'
@@ -22,7 +20,7 @@ GuildID = Union[str, int]
 class UserData(TypedDict, total=False):
     osuid: str
     bonks: int
-    guilds: list[int]
+    guilds: List[int]
 
 
 UserDataKey = Literal['osuid', 'bonks', 'guilds']
@@ -85,7 +83,7 @@ def read_user_data(uid: UserID, key: Literal["bonks"]) -> Optional[int]: ...
 
 
 @overload
-def read_user_data(uid: UserID, key: Literal["guilds"]) -> Optional[list[int]]: ...
+def read_user_data(uid: UserID, key: Literal["guilds"]) -> Optional[List[int]]: ...
 
 
 def read_user_data(uid: UserID, key: UserDataKey) -> Optional[Any]:
