@@ -115,7 +115,8 @@ async def osu_update(ctx: Context, *, u: Optional[str] = None, showhs: bool = Tr
             f'**Playcount**: {r["playcount"]}\n'
             f'**Acc**: {format_diff(round(r["accuracy"], 2))}\n\n'
             f'**New Highscores**: {len(r["newhs"])}{f" {KEKW_EMOTE}" if len(r["newhs"]) == 0 else ""}\n'
-            f'{chr(10).join(map(format_score_inline, r["newhs"])) if showhs else ""}'
+            f'{chr(10).join(map(format_score_inline, r["newhs"][:5])) if showhs else ""}'
+            f'{f"{chr(10)}..." if len(r["newhs"]) > 5 else ""}'
         )
     )
     updateEmbed.set_thumbnail(url=osu.profile_thumb(osuid))
