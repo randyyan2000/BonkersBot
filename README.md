@@ -12,5 +12,6 @@ Using Ameo's [osu!track api](https://github.com/Ameobea/osutrack-api) for osu!tr
 - [ ]  format numbers with commas
 - [ ]  add a $honk command
 - [ ]  better error handling for invalid arguments/usage documentation
-- [ ]  add command for displaying beatmap info (and potentially another for comparing scores of all members for a given map)
+- [X]  add command for displaying beatmap info 
+- [ ]  add per beatmap score leaderboard for guild members
 - [ ]  add rotating logging handler

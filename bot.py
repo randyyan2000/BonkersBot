@@ -208,6 +208,16 @@ async def osu_profile(ctx: Context, *, u: Optional[str] = ''):
     await ctx.send(embed=get_user_embed(user))
 
 
+@bot.command(aliases=('map', 'm'), help='displays info for a given beatmap id')
+async def osu_map(ctx: Context, beatmapid: str):
+    if not beatmapid:
+        return await ctx.send('No beatmap id specified!')
+    beatmap = get_beatmap(beatmapid)
+    if not beatmap:
+        return await ctx.send('Beatmap not found!')
+    return await ctx.send(embed=get_beatmap_embed(beatmap))
+
+
 @ tasks.loop(minutes=10)
 async def osu_auto_update():
     print(f'Running top score update for {dt.datetime.now()}')
@@ -361,7 +371,7 @@ def get_score_embed(score: osu.Score, osuid: str, username: str) -> Embed:
     if 'meta' not in score:
         score['meta'] = get_beatmap(score["beatmap_id"])
     bmp = score['meta']
-    title = f'{bmp["title"]}[{bmp["version"]}] | {round(float(bmp["difficultyrating"]), 2)}★'
+    title = f'{bmp["title"]} [{bmp["version"]}] | {round(float(bmp["difficultyrating"]), 2)}★'
     scoreEmbed = Embed(
         type='rich',
         color=EMBED_COLOR,
@@ -450,6 +460,34 @@ def get_user_embed(user: osu.User) -> Embed:
     return userEmbed
 
 
+def get_beatmap_embed(bmp: osu.Beatmap):
+    beatmapEmbed = Embed(
+        title=f'{bmp["title"]} [{bmp["version"]}] | {round(float(bmp["difficultyrating"]), 2)}★',
+        url=osu.beatmap_link(bmp['beatmap_id']),
+        color=EMBED_COLOR,
+    )
+    beatmapEmbed.add_field(
+        name=f'Beatmap Info ({bmp["beatmap_id"]})',
+        value=(
+            f'Length **{format_seconds(int(bmp["total_length"]))}** ~ '
+            f'Max Combo **{bmp["max_combo"]}**\n'
+            f'CS**{bmp["diff_size"]}** '
+            f'AR**{bmp["diff_approach"]}** '
+            f'OD**{bmp["diff_overall"]}** '
+            f'HP**{bmp["diff_drain"]}** ~ '
+            f'**{bmp["bpm"]}** BPM ~ '
+            f'**{round(float(bmp["difficultyrating"]), 2)}**★'
+        ),
+        inline=False
+    )
+    beatmapEmbed.set_thumbnail(url=osu.beatmap_thumb(bmp['beatmapset_id']))
+    beatmapEmbed.set_footer(
+        text=f'Mapped by {bmp["creator"]}',
+        icon_url=osu.profile_thumb(bmp['creator_id'])
+    )
+    return beatmapEmbed
+
+
 def get_osuid(ctx: Context) -> Optional[str]:
     return backend.read_user_data(ctx.author.id, 'osuid')
 
@@ -499,12 +537,17 @@ def reply_mention(ctx: Context) -> str:
 
 
 def get_user(u: str) -> Optional[osu.User]:
-    response = requests.post(f'{OSU_API_ENDPOINT}get_user', params={'k': OSU_API_KEY, 'u': u}).json()
-    return response[0] if len(response) else None
+    try:
+        return requests.post(f'{OSU_API_ENDPOINT}get_user', params={'k': OSU_API_KEY, 'u': u}).json()[0]
+    except:
+        return None
 
 
-def get_beatmap(beatmapid: str):
-    return requests.post(f'{OSU_API_ENDPOINT}get_beatmaps', params={'k': OSU_API_KEY, 'b': beatmapid}).json()[0]
+def get_beatmap(beatmapid: str) -> Optional[osu.Beatmap]:
+    try:
+        return requests.post(f'{OSU_API_ENDPOINT}get_beatmaps', params={'k': OSU_API_KEY, 'b': beatmapid}).json()[0]
+    except:
+        return None
 
 
 def get_top_scores(u: str, limit: int) -> List[osu.Score]:

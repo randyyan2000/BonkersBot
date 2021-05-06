@@ -9,14 +9,15 @@ ScoreRank = Literal['D', 'C', 'B', 'A', 'S', 'SH', 'X', 'SS', 'XH', 'SSH']
 
 # fmt: off
 class Beatmap(TypedDict):
+    approved             : int      # 4 = loved, 3 = qualified, 2 = approved, 1 = ranked, 0 = pending, -1 = WIP, -2 = graveyard
     submit_date          : str      # date submitted, in UTC
     approved_date        : str      # date ranked, in UTC
     artist               : str
-    beatmap_id           : int      # beatmap_id is per difficulty
-    beatmapset_id        : int      # beatmapset_id groups difficulties into a set
+    beatmap_id           : str      # beatmap_id is per difficulty
+    beatmapset_id        : str      # beatmapset_id groups difficulties into a set
     bpm                  : int
     creator              : str
-    creator_id           : int
+    creator_id           : str
     difficultyrating     : float    # The amount of stars the map would have ingame and on the website
     diff_aim             : float
     diff_speed           : float
@@ -121,6 +122,17 @@ MODS_ENUM = {
     '3K'  : 134217728,
     '2K'  : 268435456,
     'V2'  : 536870912,
+}
+
+
+BEATMAP_STATUS_ENUM = {
+    4 : 'loved',
+    3 : 'qualified',
+    2 : 'approved',
+    1 : 'ranked',
+    0 : 'pending',
+    -1: 'WIP',
+    -2: 'graveyard',
 }
 # fmt: on
 
