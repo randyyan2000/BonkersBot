@@ -1,11 +1,11 @@
 # bot.py
 import datetime as dt
 import json
-from json.decoder import JSONDecodeError
 import logging
 import os
 import time
-from typing import Dict, List, Mapping, Optional, Tuple, Union, cast
+from typing import List, Mapping, Optional, Union, cast
+import locale
 
 from flag import flag
 import requests
@@ -27,6 +27,8 @@ logger.setLevel(logging.DEBUG)
 handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w')
 handler.setFormatter(logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s'))
 logger.addHandler(handler)
+
+locale.setlocale(locale.LC_ALL, 'en_US.UTF-8')
 
 
 # envvars
@@ -104,7 +106,7 @@ async def osu_update(ctx: Context, *, u: Optional[str] = None, showhs: bool = Tr
         if response.status_code == 400:
             return await ctx.send(f'Invalid update request, please make sure a valid user id was given/registered.')
         else:
-            return await ctx.send('Something went wrong :(')
+            return await ctx.send('Something went wrong :( Try going to https://ameobea.me/osutrack/ to make sure you account stats are initialized.')
     r = response.json()
     updateEmbed = Embed(
         title=f'osu!track update for {r["username"]}', type='rich', color=EMBED_COLOR,
@@ -344,34 +346,35 @@ async def enable_osu_automatic_updates_error(ctx: Context, error):
 @ bot.command(aliases=('dt', 'test'), help='Super secret command used for testing during development')
 @ commands.has_permissions(administrator=True)
 async def dev_test(ctx):
-    # set up test data
-    osuid = '17626463'
-    r = json.load(open('test.json', 'r'))
-    updateEmbed = Embed(
-        title=f'osu!track update for {r["username"]}', type='rich', color=EMBED_COLOR,
-        description=(
-            f'[osu! profile]({osu.profile_link(osuid)}) · [osu!track profile]({osu.track_profile_link(r["username"])})\n'
-            f'**Rank**: {format_diff(r["pp_rank"])}\n'
-            f'**PP**: {format_diff(round(r["pp_raw"], 4))}\n'
-            f'**Playcount**: {r["playcount"]}\n'
-            f'**Acc**: {format_diff(round(r["accuracy"], 2))}\n\n'
-            f'**New Highscores**: {len(r["newhs"])}{f" {KEKW_EMOTE}" if len(r["newhs"]) == 0 else ""}\n'
-            f'{chr(10).join(map(format_score_inline, r["newhs"]))}'
-        )
-    )
-    updateEmbed.set_thumbnail(url=osu.profile_thumb(osuid))
-    await ctx.send(embed=updateEmbed)
+    pass
+    # # set up test data
+    # osuid = '17626463'
+    # r = json.load(open('test.json', 'r'))
+    # updateEmbed = Embed(
+    #     title=f'osu!track update for {r["username"]}', type='rich', color=EMBED_COLOR,
+    #     description=(
+    #         f'[osu! profile]({osu.profile_link(osuid)}) · [osu!track profile]({osu.track_profile_link(r["username"])})\n'
+    #         f'**Rank**: {format_diff(r["pp_rank"])}\n'
+    #         f'**PP**: {format_diff(round(r["pp_raw"], 4))}\n'
+    #         f'**Playcount**: {r["playcount"]}\n'
+    #         f'**Acc**: {format_diff(round(r["accuracy"], 2))}\n\n'
+    #         f'**New Highscores**: {len(r["newhs"])}{f" {KEKW_EMOTE}" if len(r["newhs"]) == 0 else ""}\n'
+    #         f'{chr(10).join(map(format_score_inline, r["newhs"]))}'
+    #     )
+    # )
+    # updateEmbed.set_thumbnail(url=osu.profile_thumb(osuid))
+    # await ctx.send(embed=updateEmbed)
 
-    hsEmbeds = [get_score_embed(hs, osuid, r["username"]) for hs in r["newhs"]]
-    for embed in hsEmbeds:
-        await ctx.send(embed=embed)
+    # hsEmbeds = [get_score_embed(hs, osuid, r["username"]) for hs in r["newhs"]]
+    # for embed in hsEmbeds:
+    #     await ctx.send(embed=embed)
 
 
 def get_score_embed(score: osu.Score, osuid: str, username: str) -> Embed:
     if 'meta' not in score:
         score['meta'] = get_beatmap(score["beatmap_id"])
     bmp = score['meta']
-    title = f'{bmp["title"]} [{bmp["version"]}] | {round(float(bmp["difficultyrating"]), 2)}★'
+    title = f'{bmp["title"]} [{bmp["version"]}] | {float(bmp["difficultyrating"]):.2f}★'
     scoreEmbed = Embed(
         type='rich',
         color=EMBED_COLOR,
@@ -393,7 +396,7 @@ def get_score_embed(score: osu.Score, osuid: str, username: str) -> Embed:
             f'OD**{bmp["diff_overall"]}** '
             f'HP**{bmp["diff_drain"]}** ~ '
             f'**{bmp["bpm"]}** BPM ~ '
-            f'**{round(float(bmp["difficultyrating"]), 2)}**★'
+            f'**{float(bmp["difficultyrating"]):.2f}**★'
         ),
         inline=False
     )
@@ -407,9 +410,9 @@ def get_user_embed(user: osu.User) -> Embed:
     osuid = user['user_id']
     userEmbed = Embed(
         title=(
-            f'{flag(user["country"])} {user["username"]} - {user["pp_raw"]}pp | '
-            f'#{user["pp_rank"]} | '
-            f'{user["country"]} #{user["pp_country_rank"]}'
+            f'{flag(user["country"])} {user["username"]} - {float(user["pp_raw"]):n}pp | '
+            f'#{int(user["pp_rank"]):n} | '
+            f'{user["country"]} #{int(user["pp_country_rank"]):n}'
         ),
         url=osu.profile_link(osuid),
         type='rich',
@@ -417,22 +420,22 @@ def get_user_embed(user: osu.User) -> Embed:
     )
     userEmbed.add_field(
         name='Ranked Score',
-        value=f'{user["ranked_score"]}',
+        value=f'{int(user["ranked_score"]):n}',
         inline=True
     )
     userEmbed.add_field(
         name='Total score',
-        value=f'{user["total_score"]}',
+        value=f'{int(user["total_score"]):n}',
         inline=True,
     )
     userEmbed.add_field(
         name='Hit Accuracy',
-        value=f'{round(float(user["accuracy"]), 2)}%',
+        value=f'{float(user["accuracy"]):.2f}%',
         inline=True,
     )
     userEmbed.add_field(
         name='Play Count',
-        value=f'{user["playcount"]}',
+        value=f'{int(user["playcount"]):n}',
         inline=True,
     )
     userEmbed.add_field(
@@ -448,11 +451,11 @@ def get_user_embed(user: osu.User) -> Embed:
     userEmbed.add_field(
         name='Grades',
         value=(
-            f'{osu_score_emoji("XH")} \u200b {user["count_rank_ssh"]} \u200b '
-            f'{osu_score_emoji("SS")} \u200b {user["count_rank_ss"]} \u200b '
-            f'{osu_score_emoji("SH")} \u200b {user["count_rank_sh"]} \u200b '
-            f'{osu_score_emoji("S")} \u200b {user["count_rank_s"]} \u200b '
-            f'{osu_score_emoji("A")} \u200b {user["count_rank_a"]}'
+            f'{osu_score_emoji("XH")} \u200b {int(user["count_rank_ssh"]):n} \u200b '
+            f'{osu_score_emoji("SS")} \u200b {int(user["count_rank_ss"]):n} \u200b '
+            f'{osu_score_emoji("SH")} \u200b {int(user["count_rank_sh"]):n} \u200b '
+            f'{osu_score_emoji("S")} \u200b {int(user["count_rank_s"]):n} \u200b '
+            f'{osu_score_emoji("A")} \u200b {int(user["count_rank_a"]):n}'
         ),
         inline=False,
     )
@@ -462,7 +465,7 @@ def get_user_embed(user: osu.User) -> Embed:
 
 def get_beatmap_embed(bmp: osu.Beatmap):
     beatmapEmbed = Embed(
-        title=f'{bmp["title"]} [{bmp["version"]}] | {round(float(bmp["difficultyrating"]), 2)}★',
+        title=f'{bmp["title"]} [{bmp["version"]}] | {float(bmp["difficultyrating"]):.2f}★',
         url=osu.beatmap_link(bmp['beatmap_id']),
         color=EMBED_COLOR,
     )
@@ -476,7 +479,7 @@ def get_beatmap_embed(bmp: osu.Beatmap):
             f'OD**{bmp["diff_overall"]}** '
             f'HP**{bmp["diff_drain"]}** ~ '
             f'**{bmp["bpm"]}** BPM ~ '
-            f'**{round(float(bmp["difficultyrating"]), 2)}**★'
+            f'**{float(bmp["difficultyrating"]):.2f}**★'
         ),
         inline=False
     )
