@@ -9,9 +9,11 @@ Using Ameo's [osu!track api](https://github.com/Ameobea/osutrack-api) for osu!tr
 - [x]  support usernames with spaces
 - [ ]  update score embed difficulties based on enabled mods (dt/ht, hr/ez)
 - [ ]  support any tr range, chunk scores by 10 to stay below embed size limit
-- [ ]  format numbers with commas
+- [x]  format numbers with commas
 - [ ]  add a $honk command
 - [ ]  better error handling for invalid arguments/usage documentation
 - [X]  add command for displaying beatmap info 
 - [ ]  add per beatmap score leaderboard for guild members
 - [ ]  add rotating logging handler
+- [ ]  automatic type conversion for api response objects
+- [ ]  types for osu track api responses

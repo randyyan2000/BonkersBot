@@ -554,13 +554,18 @@ def get_beatmap(beatmapid: str) -> Optional[osu.Beatmap]:
 
 
 def get_top_scores(u: str, limit: int) -> List[osu.Score]:
-    topScores = requests.post(
+    response = requests.post(
         f'{OSU_API_ENDPOINT}get_user_best',
         params={'k': OSU_API_KEY, 'u': u, 'limit': limit}
-    ).json()
-    for i, score in enumerate(topScores):
-        score["ranking"] = i
-    return topScores
+    )
+    try:
+        topScores = response.json()
+        for i, score in enumerate(topScores):
+            score["ranking"] = i
+        return topScores
+    except:
+        logger.critical(f'get_user_best api call failed! Reponse: {response.text}')
+        return []
 
 
 def get_score_acc(score: osu.Score):
