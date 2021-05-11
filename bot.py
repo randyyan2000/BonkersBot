@@ -149,8 +149,8 @@ async def osu_top(ctx: Context, rank: int = 1, *, u: Optional[str] = None):
 @ bot.command(aliases=('tr', 'topr', 'toprange'),
               help='$toprange (<rankstart=1>) (<rankend=1>) (<username/userid>) gets a range of top scores for a given osu user (defaults to your registered user)')
 async def osu_toprange(ctx: Context, rankstart: int = 1, rankend: int = 10, *, u: Optional[str] = None):
-    if rankstart < 1 or rankend < 1 or rankend > 100 or rankstart > rankend or rankend - rankstart >= 15:
-        return await ctx.send('invalid score rank range (max 15 scores, ranks must be between 1-100) ')
+    if rankstart < 1 or rankend < 1 or rankend > 100 or rankstart > rankend or rankend - rankstart >= 30:
+        return await ctx.send('invalid score rank range (max 30 scores, ranks must be between 1-100) ')
     if not u:
         u = get_osuid(ctx)
     if not u:
@@ -159,19 +159,23 @@ async def osu_toprange(ctx: Context, rankstart: int = 1, rankend: int = 10, *, u
     if not topScores:
         return await ctx.send(f'No top scores found for user {u}. Make sure to provide a valid osu username/id.')
     scores = topScores[rankstart - 1: rankend]
+    chunkedScores = [scores[i * 10:(i + 1) * 10] for i in range((len(scores) + 9) // 10)]
     user = get_user(u)
-
-    toprangeEmbed = Embed(
-        type='rich',
-        color=EMBED_COLOR,
-        description='\n'.join(map(format_score_inline, scores))
-    )
-    toprangeEmbed.set_author(
-        name=f'Top {rankstart} - {rankend} scores for {user["username"]}',
-        url=osu.profile_link(user["user_id"]),
-        icon_url=osu.profile_thumb(user["user_id"]),
-    )
-    await ctx.send(embed=toprangeEmbed)
+    first = True
+    for scoreChunk in chunkedScores:
+        toprangeEmbed = Embed(
+            type='rich',
+            color=EMBED_COLOR,
+            description='\n'.join(map(format_score_inline, scoreChunk))
+        )
+        if first:
+            toprangeEmbed.set_author(
+                name=f'Top {rankstart} - {rankend} scores for {user["username"]}',
+                url=osu.profile_link(user["user_id"]),
+                icon_url=osu.profile_thumb(user["user_id"]),
+            )
+            first = False
+        await ctx.send(embed=toprangeEmbed)
 
 
 @ bot.command(aliases=('register', 'r'),
