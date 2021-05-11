@@ -1,9 +1,8 @@
 # bot.py
 import datetime as dt
-from honk import get_honk
-import json
 import logging
 import os
+import random
 import time
 from typing import List, Mapping, Optional, Union, cast
 import locale
@@ -22,6 +21,7 @@ from humanize import naturaltime
 
 import osu
 import backend
+from honk import get_honk
 
 logger = logging.getLogger('discord')
 logger.setLevel(logging.DEBUG)
@@ -93,7 +93,9 @@ async def bonk(ctx: Context):
 
 @bot.command(help='honk')
 async def honk(ctx: Context):
-    await ctx.send(get_honk())
+    message = await ctx.send(get_honk())
+    time.sleep(5)
+    await message.edit(content=random.choice(['🎺', '📯', '🇭 🇴 🇳 🇰']))
 
 
 @bot.command(aliases=('update', 'u'),

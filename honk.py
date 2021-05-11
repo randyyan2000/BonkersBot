@@ -13,7 +13,6 @@ honks: List[str] = [
     'https://tenor.com/view/goose-honk-inhale-inhales-untitled-gif-16237480',
     'https://tenor.com/view/truck-horns-driver-gif-8941664',
     'https://tenor.com/view/pepe-peepo-clown-gif-20274815',
-    '📯',
     'https://tenor.com/view/untitled-goose-game-ouch-rude-honk-geese-gif-16427770',
     'https://tenor.com/view/pepe-peepo-clown-gif-20274804',
     'https://tenor.com/view/honk-goose-game-untitled-goose-game-flapping-wings-gif-16627067',
@@ -24,4 +23,4 @@ honks: List[str] = [
 
 
 def get_honk() -> str:
-    return honks[random.randrange(0, len(honks))]
+    return random.choice(honks)
