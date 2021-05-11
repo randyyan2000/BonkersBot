@@ -1,5 +1,6 @@
 # bot.py
 import datetime as dt
+from honk import get_honk
 import json
 import logging
 import os
@@ -88,6 +89,11 @@ async def bonk(ctx: Context):
     bonks += 1
     backend.write_user_data(ctx.author.id, data={'bonks': bonks})
     await ctx.send(f'Boop. {reply_mention(ctx)} has bonked the bonkers {bonks} time{"" if bonks == 1 else "s"}')
+
+
+@bot.command(help='honk')
+async def honk(ctx: Context):
+    await ctx.send(get_honk())
 
 
 @bot.command(aliases=('update', 'u'),
@@ -350,7 +356,9 @@ async def enable_osu_automatic_updates_error(ctx: Context, error):
 @ bot.command(aliases=('dt', 'test'), help='Super secret command used for testing during development')
 @ commands.has_permissions(administrator=True)
 async def dev_test(ctx):
-    pass
+    await ctx.send(get_honk())
+
+    # pass
     # # set up test data
     # osuid = '17626463'
     # r = json.load(open('test.json', 'r'))
