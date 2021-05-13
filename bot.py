@@ -287,7 +287,7 @@ async def before_osu_auto_update():
     await bot.wait_until_ready()  # wait until the bot logs on
 
 
-def is_recent_score(score, timedelta=dt.timedelta(minutes=10, seconds=10)) -> bool:
+def is_recent_score(score, timedelta=dt.timedelta(minutes=10, seconds=5)) -> bool:
     '''
         Returns True if `score` was submitted within `timedelta` (default 1 day) time before datetime.utcnow()
     '''
