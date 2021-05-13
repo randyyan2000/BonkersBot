@@ -1,10 +1,11 @@
-from typing import TypedDict, Union
+from typing import TypedDict, Union, List
 from urllib.parse import quote
 
 from typing_extensions import Literal
 
 # osu types (mostly mirrors osu api/ameo api documentation) with exceptions commented
-# https://github.com/ppy/osu-api/wiki https://github.com/Ameobea/osutrack-api
+# osu! api: https://github.com/ppy/osu-api/wiki
+# osu!track api (ameo): https://github.com/Ameobea/osutrack-api
 ScoreRank = Literal['D', 'C', 'B', 'A', 'S', 'SH', 'X', 'SS', 'XH', 'SSH']
 
 # fmt: off
@@ -89,6 +90,29 @@ class User(TypedDict):
     country              : int      # Uses the ISO3166-1 alpha-2 country code naming. See this for more information: https:#en.wikipedia.org/wiki/ISO_3166-1_alpha-2)
     total_seconds_played : int
     pp_country_rank      : int      # The user's rank in the country.
+
+
+# response from osu!track api update requrest
+class Update(TypedDict):
+    username:       str
+    mode:           int
+    playcount:      int
+    pp_rank:        int
+    pp_raw:         float
+    accuracy:       float
+    total_score:    int
+    ranked_score:   int
+    count300:       int
+    count50:        int
+    count100:       int
+    level:          float
+    count_rank_a:   int
+    count_rank_s:   int
+    count_rank_ss:  int
+    levelup:        bool        # whether or not the user leveled up since the last update
+    first:          bool        # whether this is the first update for the user, meaning that there was no previous update to compare to
+    exists:         bool        # whether the user exists or not; if this is false, check the user ID you provided
+    newhs:          List[Score] # an array of new hiscores for the user
 
 
 MODS_ENUM = {
