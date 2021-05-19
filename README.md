@@ -10,6 +10,8 @@ Using Ameo's [osu!track api](https://github.com/Ameobea/osutrack-api) for osu!tr
 - [ ]  add per beatmap score leaderboard for guild members
 - [ ]  add rotating logging handler
 - [ ]  automatic type conversion for api response objects
+- [ ]  allow for per server leaderrboard for a given map 
+- [ ]  add support for other osu game modes
   
 
 ### Completed
@@ -20,3 +22,4 @@ Using Ameo's [osu!track api](https://github.com/Ameobea/osutrack-api) for osu!tr
 - [X]  support any tr range, chunk scores by 10 to stay below embed size limit
 - [X]  add a $honk command, for better or for worse
 - [X]  types for osu track api responses
+- [X]  command for per server leaderboard (pp, rank)

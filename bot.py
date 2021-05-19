@@ -6,6 +6,7 @@ import random
 import time
 from typing import List, Mapping, Optional, Union, cast
 import locale
+from utils import chunk
 
 from flag import flag
 import requests
@@ -98,8 +99,10 @@ async def honk(ctx: Context):
     await message.edit(content=random.choice(['🎺', '📯', '🇭 🇴 🇳 🇰']))
 
 
-@bot.command(aliases=('update', 'u'),
-             help='Runs an osu!track update for your registered profile (see $register) or an explicitly specified uid $update `<uid>`')
+@bot.command(
+    aliases=('update', 'u'),
+    help='Runs an osu!track update for your registered profile (see $register) or an explicitly specified uid $update `<uid>`'
+)
 async def osu_update(ctx: Context, *, u: Optional[str] = None, showhs: bool = True):
     if not u:
         u = get_osuid(ctx)
@@ -137,8 +140,10 @@ async def osu_update(ctx: Context, *, u: Optional[str] = None, showhs: bool = Tr
             await ctx.send(embed=embed)
 
 
-@ bot.command(aliases=('t', 'top'),
-              help='$top (<rank=1>) (<username/userid>) gets the top #rank score for a given osu user (defaults to your registered user)')
+@ bot.command(
+    aliases=('t', 'top'),
+    help='$top (<rank=1>) (<username/userid>) gets the top #rank score for a given osu user (defaults to your registered user)'
+)
 async def osu_top(ctx: Context, rank: int = 1, *, u: Optional[str] = None):
     if rank < 1 or rank > 100:
         return await ctx.send('invalid score rank (must be between 1-100)')
@@ -154,8 +159,10 @@ async def osu_top(ctx: Context, rank: int = 1, *, u: Optional[str] = None):
     await ctx.send(embed=get_score_embed(score, user['user_id'], user['username']))
 
 
-@ bot.command(aliases=('tr', 'topr', 'toprange'),
-              help='$toprange (<rankstart=1>) (<rankend=1>) (<username/userid>) gets a range of top scores for a given osu user (defaults to your registered user)')
+@ bot.command(
+    aliases=('tr', 'topr', 'toprange'),
+    help='$toprange (<rankstart=1>) (<rankend=1>) (<username/userid>) gets a range of top scores for a given osu user (defaults to your registered user)'
+)
 async def osu_toprange(ctx: Context, rankstart: int = 1, rankend: int = 10, *, u: Optional[str] = None):
     if rankstart < 1 or rankend < 1 or rankend > 100 or rankstart > rankend or rankend - rankstart >= 30:
         return await ctx.send('invalid score rank range (max 30 scores, ranks must be between 1-100) ')
@@ -167,7 +174,7 @@ async def osu_toprange(ctx: Context, rankstart: int = 1, rankend: int = 10, *, u
     if not topScores:
         return await ctx.send(f'No top scores found for user {u}. Make sure to provide a valid osu username/id.')
     scores = topScores[rankstart - 1: rankend]
-    chunkedScores = [scores[i * 10:(i + 1) * 10] for i in range((len(scores) + 9) // 10)]
+    chunkedScores = chunk(scores, 10)
     user = get_user(u)
     first = True
     for scoreChunk in chunkedScores:
@@ -186,8 +193,10 @@ async def osu_toprange(ctx: Context, rankstart: int = 1, rankend: int = 10, *, u
         await ctx.send(embed=toprangeEmbed)
 
 
-@ bot.command(aliases=('register', 'r'),
-              help='Registers an osu account to your discord user and runs an intial osu!track update')
+@ bot.command(
+    aliases=('register', 'r'),
+    help='Registers an osu account to your discord user and runs an intial osu!track update'
+)
 async def osu_register(ctx: Context, *, u: Optional[str] = None):
     if not u:
         return await ctx.send('Please specify an osu profile username/id!')
@@ -210,7 +219,10 @@ async def osu_register(ctx: Context, *, u: Optional[str] = None):
         await osu_update(ctx, u=user['user_id'], showhs=False)
 
 
-@ bot.command(aliases=('profile', 'p'), help='Displays a profile card for an osu account (default yours)')
+@ bot.command(
+    aliases=('profile', 'p'),
+    help='Displays a profile card for an osu account (default yours)'
+)
 async def osu_profile(ctx: Context, *, u: Optional[str] = ''):
     if not u:
         u = get_osuid(ctx)
@@ -230,6 +242,57 @@ async def osu_map(ctx: Context, beatmapid: str):
     if not beatmap:
         return await ctx.send('Beatmap not found!')
     return await ctx.send(embed=get_beatmap_embed(beatmap))
+
+
+@bot.command(
+    aliases=('l', 'sl'),
+    help='displays a leaderboard for registered osu profiles in this server'
+)
+async def osu_leaderboard(ctx: Context, mode: int = 0):
+    if mode != 0:
+        return await ctx.send('only osu! standard supported at the moment :(')
+    gid = ctx.guild.id
+    userData = backend.read_all_data(backend.USER_DATA)
+    guildUsers: List[osu.User] = []
+    for uid, userData in userData.items():
+        if 'osuid' not in userData or 'guilds' not in userData:
+            continue
+        registeredGuilds = userData['guilds']
+        if gid in registeredGuilds:
+            user = get_user(userData['osuid'])
+            if user:
+                guildUsers.append(user)
+            else:
+                await ctx.send(
+                    f'Profile retrieval failed for user {osu.profile_link(userData["osuid"])}'
+                )
+    guildUsers.sort(key=lambda user: int(user['pp_rank']))
+    chunkedGuildUsers = chunk(guildUsers, 10)
+
+    first = True
+    for userChunk in chunkedGuildUsers:
+        leaderboardRows = []
+        for i, user in enumerate(userChunk):
+            leaderboardRows.append(
+                f'**#{i + 1}** '
+                f'{flag(user["country"])} [{user["username"]}]({osu.profile_link(user["user_id"])}) - '
+                f'#{int(user["pp_rank"]):n} | '
+                f'{float(user["pp_raw"]):n}pp | '
+                f'LVL {float(user["level"]):.2f}'
+            )
+
+        leaderboardEmbed = Embed(
+            type='rich',
+            color=EMBED_COLOR,
+            description='\n'.join(leaderboardRows)
+        )
+        if first:
+            leaderboardEmbed.set_author(
+                name=f'osu! standard leaderboard for {ctx.guild.name}',
+                icon_url=str(ctx.guild.icon_url) or Embed.Empty,
+            )
+            first = False
+        await ctx.send(embed=leaderboardEmbed)
 
 
 @ tasks.loop(minutes=10)
