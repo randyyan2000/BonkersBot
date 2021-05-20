@@ -70,6 +70,7 @@ def get_prefix(bot: commands.Bot, message: Message):
 
 bot = commands.Bot(
     command_prefix=get_prefix,
+    case_insensitive=True,
     activity=Game('$help, feel free to @Honkers with any feedback'),
 )
 
