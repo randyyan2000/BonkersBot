@@ -547,7 +547,7 @@ def get_beatmap_embed(bmp: osu.Beatmap):
         color=EMBED_COLOR,
     )
     beatmapEmbed.add_field(
-        name=f'Beatmap Info ({bmp["beatmap_id"]})',
+        name=f'Beatmap Info ({bmp["beatmap_id"]}) ({osu.BEATMAP_STATUS_ENUM[int(bmp["approved"])]})',
         value=(
             f'Length **{format_seconds(int(bmp["total_length"]))}** ~ '
             f'Max Combo **{bmp["max_combo"]}**\n'
@@ -665,5 +665,5 @@ def osu_score_emoji(rank: osu.ScoreRank) -> Union[Emoji, str]:
 
 if not TOKEN:
     raise Exception('no discord bot token DISCORD_TOKEN provided in .env file')
-osu_auto_update.start()
+# osu_auto_update.start()
 bot.run(TOKEN)

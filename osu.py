@@ -150,13 +150,13 @@ MODS_ENUM = {
 
 
 BEATMAP_STATUS_ENUM = {
-    4 : 'loved',
-    3 : 'qualified',
-    2 : 'approved',
-    1 : 'ranked',
-    0 : 'pending',
+    4 : 'Loved',
+    3 : 'Qualified',
+    2 : 'Approved',
+    1 : 'Ranked',
+    0 : 'Pending',
     -1: 'WIP',
-    -2: 'graveyard',
+    -2: 'Graveyard',
 }
 # fmt: on
 
