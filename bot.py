@@ -249,8 +249,6 @@ async def osu_map(ctx: Context, beatmapid: str):
     help='displays a leaderboard for registered osu profiles in this server'
 )
 async def osu_leaderboard(ctx: Context, mode: int = 0):
-    if mode != 0:
-        return await ctx.send('only osu! standard supported at the moment :(')
     gid = ctx.guild.id
     userData = backend.read_all_data(backend.USER_DATA)
     guildUsers: List[osu.User] = []
@@ -259,14 +257,14 @@ async def osu_leaderboard(ctx: Context, mode: int = 0):
             continue
         registeredGuilds = userData['guilds']
         if gid in registeredGuilds:
-            user = get_user(userData['osuid'])
+            user = get_user(userData['osuid'], mode)
             if user:
                 guildUsers.append(user)
             else:
                 await ctx.send(
                     f'Profile retrieval failed for user {osu.profile_link(userData["osuid"])}'
                 )
-    guildUsers.sort(key=lambda user: int(user['pp_rank']))
+    guildUsers.sort(key=lambda user: (int(user['pp_rank'] or 0) or float('inf'), -float(user['level'] or 0)))
     chunkedGuildUsers = chunk(guildUsers, 10)
 
     first = True
@@ -276,9 +274,9 @@ async def osu_leaderboard(ctx: Context, mode: int = 0):
             leaderboardRows.append(
                 f'**#{i + 1}** '
                 f'{flag(user["country"])} [{user["username"]}]({osu.profile_link(user["user_id"])}) - '
-                f'#{int(user["pp_rank"]):n} | '
-                f'{float(user["pp_raw"]):n}pp | '
-                f'LVL {float(user["level"]):.2f}'
+                f'#{int(user["pp_rank"] or 0):n} | '
+                f'{float(user["pp_raw"] or 0):n}pp | '
+                f'LVL {float(user["level"] or 0):.2f}'
             )
 
         leaderboardEmbed = Embed(
@@ -288,7 +286,7 @@ async def osu_leaderboard(ctx: Context, mode: int = 0):
         )
         if first:
             leaderboardEmbed.set_author(
-                name=f'osu! standard leaderboard for {ctx.guild.name}',
+                name=f'{osu.MODE_STRING_ENUM[mode]} leaderboard for {ctx.guild.name}',
                 icon_url=str(ctx.guild.icon_url) or Embed.Empty,
             )
             first = False
@@ -616,9 +614,12 @@ def reply_mention(ctx: Context) -> str:
     return f'<@{ctx.author.id}>'
 
 
-def get_user(u: str) -> Optional[osu.User]:
+def get_user(u: str, mode: int = 0) -> Optional[osu.User]:
     try:
-        return requests.post(f'{OSU_API_ENDPOINT}get_user', params={'k': OSU_API_KEY, 'u': u}).json()[0]
+        return requests.post(
+            f'{OSU_API_ENDPOINT}get_user',
+            params={'k': OSU_API_KEY, 'u': u, 'm': mode}
+        ).json()[0]
     except:
         return None
 
@@ -665,5 +666,5 @@ def osu_score_emoji(rank: osu.ScoreRank) -> Union[Emoji, str]:
 
 if not TOKEN:
     raise Exception('no discord bot token DISCORD_TOKEN provided in .env file')
-# osu_auto_update.start()
+osu_auto_update.start()
 bot.run(TOKEN)

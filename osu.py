@@ -158,6 +158,14 @@ BEATMAP_STATUS_ENUM = {
     -1: 'WIP',
     -2: 'Graveyard',
 }
+
+
+MODE_STRING_ENUM = {
+    0 : 'osu! standard',
+    1 : 'Taiko',
+    2 : 'CtB',
+    3 : 'osu!mania',
+}
 # fmt: on
 
 

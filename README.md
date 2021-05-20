@@ -9,9 +9,10 @@ Using Ameo's [osu!track api](https://github.com/Ameobea/osutrack-api) for osu!tr
 - [ ]  better error handling for invalid arguments/usage documentation
 - [ ]  add per beatmap score leaderboard for guild members
 - [ ]  add rotating logging handler
-- [ ]  automatic type conversion for api response objects
-- [ ]  allow for per server leaderrboard for a given map 
+- [ ]  automatic type conversion for api response objects AND none/null handling
+- [ ]  allow for per server leaderboard for a given map 
 - [ ]  add support for other osu game modes
+  - [X]  done for osu_leaderboard (needs to be made more user friendly i.e. recognizing gamemode name strings)
   
 
 ### Completed
