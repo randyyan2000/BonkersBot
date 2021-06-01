@@ -24,3 +24,5 @@ Using Ameo's [osu!track api](https://github.com/Ameobea/osutrack-api) for osu!tr
 - [X]  add a $honk command, for better or for worse
 - [X]  types for osu track api responses
 - [X]  command for per server leaderboard (pp, rank)
+- [X]  replay download links in score embeds
+- [X]  300/100/50/X counts in score embeds

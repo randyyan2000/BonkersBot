@@ -207,3 +207,7 @@ def beatmap_thumb(beatmapsetid: Union[int, str]) -> str:
 
 def beatmap_link(beatmapid: str) -> str:
     return f'https://osu.ppy.sh/b/{beatmapid}'
+
+
+def score_replay_link(scoreid: str) -> str:
+    return f'https://osu.ppy.sh/scores/osu/{scoreid}/download'

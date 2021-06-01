@@ -10,13 +10,12 @@ from utils import chunk
 
 from flag import flag
 import requests
-from discord import Color, Embed, Emoji
+from discord import Color, Embed, Emoji, Message
 from discord.activity import Game
 from discord.channel import TextChannel
 from discord.enums import ChannelType
 from discord.ext import commands, tasks
 from discord.ext.commands.context import Context
-from discord.message import Message
 from dotenv import load_dotenv
 from humanize import naturaltime
 
@@ -55,6 +54,12 @@ OSU_SCORE_EMOJI_MAP: Mapping[osu.ScoreRank, str] = {
     'A': '<:osuA:835607165263020052>',
     'B': '<:osuB:835611278357299202>',
     'C': '<:osuC:835611278172487694>',
+}
+OSU_HIT_EMOJI_MAP = {
+    'miss': '<:osuMiss:849349136955867166>',
+    '50':   '<:osu50:849353678774206465>',
+    '100':  '<:osu100:849349027438002176>',
+    '300':  '<:osu300:849349068383453194>',
 }
 
 AUTO_UPDATE_CHANNEL_ID: int = 0
@@ -451,30 +456,36 @@ def get_score_embed(score: osu.Score, osuid: str, username: str) -> Embed:
         score['meta'] = get_beatmap(score["beatmap_id"])
     bmp = score['meta']
     title = f'{bmp["title"]} [{bmp["version"]}] | {float(bmp["difficultyrating"]):.2f}★'
+
+    description = (
+        f'**[{title}]({osu.beatmap_link(score["beatmap_id"])})\n'
+        f'{osu_score_emoji(score["rank"])} | '
+        f'{osu.mod_string(int(score["enabled_mods"]))} | '
+        f'{get_score_acc(score)}% ({score["maxcombo"]}/{bmp["max_combo"]}) | '
+        f'{score["pp"]}pp | '
+        f'{get_score_timedelta(score)}**\n'
+        f'{OSU_HIT_EMOJI_MAP["300"]} {score["count300"]} '
+        f'{OSU_HIT_EMOJI_MAP["100"]} {score["count100"]}'
+        f'{OSU_HIT_EMOJI_MAP["50"]} {score["count50"]} '
+        f'{OSU_HIT_EMOJI_MAP["miss"]} {score["countmiss"]}\n\n'
+        f'**Beatmap Info** ({bmp["beatmap_id"]})'
+    )
+    if int(score['replay_available']) == 1:
+        description += f' ([Replay]({osu.score_replay_link(score["score_id"])}))'
+    description += (
+        f'\nLength **{format_seconds(int(bmp["total_length"]))}** ~ '
+        f'CS**{bmp["diff_size"]}** '
+        f'AR**{bmp["diff_approach"]}** '
+        f'OD**{bmp["diff_overall"]}** '
+        f'HP**{bmp["diff_drain"]}** ~ '
+        f'**{bmp["bpm"]}** BPM ~ '
+        f'**{float(bmp["difficultyrating"]):.2f}**★'
+    )
+
     scoreEmbed = Embed(
         type='rich',
         color=EMBED_COLOR,
-        description=(
-            f'**[{title}]({osu.beatmap_link(score["beatmap_id"])})\n'
-            f'{osu_score_emoji(score["rank"])} | '
-            f'{osu.mod_string(int(score["enabled_mods"]))} | '
-            f'{get_score_acc(score)}% ({score["maxcombo"]}/{bmp["max_combo"]}) | '
-            f'{score["pp"]}pp | '
-            f'{get_score_timedelta(score)}**'
-        ),
-    )
-    scoreEmbed.add_field(
-        name=f'Beatmap Info ({bmp["beatmap_id"]})',
-        value=(
-            f'Length **{format_seconds(int(bmp["total_length"]))}** ~ '
-            f'CS**{bmp["diff_size"]}** '
-            f'AR**{bmp["diff_approach"]}** '
-            f'OD**{bmp["diff_overall"]}** '
-            f'HP**{bmp["diff_drain"]}** ~ '
-            f'**{bmp["bpm"]}** BPM ~ '
-            f'**{float(bmp["difficultyrating"]):.2f}**★'
-        ),
-        inline=False
+        description=description,
     )
     authortitle = f'{username} - #{score["ranking"] + 1} Top Play' if 'ranking' in score else username
     scoreEmbed.set_author(name=authortitle, url=osu.profile_link(osuid), icon_url=osu.profile_thumb(osuid))
