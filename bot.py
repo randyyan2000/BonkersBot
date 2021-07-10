@@ -90,6 +90,13 @@ async def hello(ctx: Context):
     await ctx.send('Hello!')
 
 
+@bot.command(help='Gives some info about the Bonkers')
+async def about(ctx: Context):
+    await ctx.send(
+        'Developed by Randy. Hopefully it\'s not too shitty :P. https://github.com/randyyan2000/BonkersBot'
+    )
+
+
 @bot.command(help='Bonk the bonkers')
 async def bonk(ctx: Context):
     bonks = backend.read_user_data(ctx.author.id, 'bonks') or 0
@@ -305,10 +312,10 @@ async def osu_auto_update():
     logger.debug(f'Running top score update for {dt.datetime.now()}')
 
     # allRecentTopScores = {}
-    userData = backend.read_all_data(backend.USER_DATA)
-    guildData = backend.read_all_data(backend.GUILD_DATA)
+    allUserData = backend.read_all_data(backend.USER_DATA)
+    allGuildData = backend.read_all_data(backend.GUILD_DATA)
 
-    for uid, userData in userData.items():
+    for uid, userData in allUserData.items():
         if 'osuid' not in userData or 'guilds' not in userData:
             continue
         registeredGuilds = userData['guilds']
@@ -321,7 +328,8 @@ async def osu_auto_update():
         #     allRecentTopScores[(uid, osuid)] = recentTopScores
         if len(recentTopScores):
             for gid in registeredGuilds:
-                cid = guildData.get(str(gid), {}).get('osu_update_channel')
+                guildData = allGuildData.get(gid, {})
+                cid = guildData.get('osu_update_channel')
                 if not cid:
                     continue
                 channel = bot.get_channel(cid)
@@ -330,10 +338,17 @@ async def osu_auto_update():
                     logger.error(f'Top score update failed: invalid channel ID {cid}')
                     continue
                 channel = cast(TextChannel, channel)
-                await channel.send(f'New top scores for <@{uid}>')
-                user = get_user(osuid)
-                for score in recentTopScores:
-                    await channel.send(embed=get_score_embed(score, osuid, user['username']))
+
+                # filter scores on osu_update_cutoff
+                scoreCutoff = min(guildData.get('osu_update_score_cutoff', 100), 100)
+                filteredRecentTopScores = list(filter(
+                    lambda score : score['ranking'] < scoreCutoff, recentTopScores
+                ))
+                if len(filteredRecentTopScores):
+                    await channel.send(f'New top scores for <@{uid}>')
+                    user = get_user(osuid)
+                    for score in filteredRecentTopScores:
+                        await channel.send(embed=get_score_embed(score, osuid, user['username']))
 
     # if len(allRecentTopScores):
     #     print(allRecentTopScores)
@@ -402,7 +417,7 @@ async def osu_unregister(ctx: Context):
 
 @ bot.command(aliases=('enable_osu_auto_update', 'osu_auto_update', 'eoau'),
               help='Enables automatic updates of highscores for registered users')
-# @ commands.has_permissions(administrator=True)
+@ commands.has_permissions(administrator=True)
 async def enable_osu_automatic_updates(ctx: Context):
     global AUTO_UPDATE_CHANNEL_ID
     oldUpdateChannelID = AUTO_UPDATE_CHANNEL_ID
@@ -420,6 +435,22 @@ async def enable_osu_automatic_updates(ctx: Context):
 @ enable_osu_automatic_updates.error
 async def enable_osu_automatic_updates_error(ctx: Context, error):
     await ctx.send('You must be an admin to enable automatic top score updates')
+
+
+@ bot.command(aliases=('set_osu_update_cutoff', 'cutoff'),
+              help='Sets the top score cutoff for automatic updates')
+@ commands.has_permissions(administrator=True)
+async def set_osu_auto_update_cutoff(ctx: Context, cutoff: int):
+    if cutoff < 1 or cutoff > 100:
+        return await ctx.send('Invalid cutoff (must be between 1-100)')
+    backend.write_guild_data(ctx.guild.id, data={'osu_update_score_cutoff': cutoff})
+    await ctx.message.add_reaction('✅')
+    await ctx.send(f'Bonkers will now only send update with scores in the top {cutoff}')
+
+
+@ set_osu_auto_update_cutoff.error
+async def enable_osu_automatic_updates_error(ctx: Context, error):
+    await ctx.send('You must be an admin to set the top score update cutoff')
 
 
 @ bot.command(aliases=('dt', 'test'), help='Super secret command used for testing during development')

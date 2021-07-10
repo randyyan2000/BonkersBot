@@ -28,6 +28,7 @@ UserDataKey = Literal['osuid', 'bonks', 'guilds']
 
 class GuildData(TypedDict, total=False):
     osu_update_channel: int
+    osu_update_score_cutoff: int
     prefix: str
 
 
@@ -71,7 +72,7 @@ def read_data(filename: GuildDataFilenameType, *, id: GuildID, key: str) -> Any:
 def read_data(filename: FilenameType, *, id: Union[int, str], key: str):
     allData = read_all_data(filename)
     userData = allData[f'{id}'] if f'{id}' in allData else {}
-    return userData[key] if key in userData else None
+    return userData.get(key, None)
 
 
 @overload
