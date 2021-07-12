@@ -328,9 +328,10 @@ async def osu_auto_update():
         #     allRecentTopScores[(uid, osuid)] = recentTopScores
         if len(recentTopScores):
             for gid in registeredGuilds:
-                guildData = allGuildData.get(gid, {})
+                guildData = allGuildData.get(str(gid), {})
                 cid = guildData.get('osu_update_channel')
                 if not cid:
+                    logger.warn(f'registered guild {gid} has no auto update channel set')
                     continue
                 channel = bot.get_channel(cid)
                 if not channel or channel.type != ChannelType.text:
