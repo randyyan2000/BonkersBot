@@ -394,7 +394,7 @@ async def set_bonkers_prefix_error(ctx: Context, error):
     await ctx.send('You must be an admin to enable automatic top score updates')
 
 
-@bot.command(help='Changes the prefix for commands to be recognized by Bonkers')
+@bot.command(help='Unregisters mentioned users')
 @commands.has_permissions(administrator=True)
 async def osu_unregister(ctx: Context):
     mentionedIDs = [mention.id for mention in ctx.message.mentions]
@@ -419,17 +419,9 @@ async def osu_unregister(ctx: Context):
               help='Enables automatic updates of highscores for registered users')
 @ commands.has_permissions(administrator=True)
 async def enable_osu_automatic_updates(ctx: Context):
-    global AUTO_UPDATE_CHANNEL_ID
-    oldUpdateChannelID = AUTO_UPDATE_CHANNEL_ID
-    AUTO_UPDATE_CHANNEL_ID = ctx.channel.id
-    backend.write_guild_data(ctx.guild.id, data={'osu_update_channel': AUTO_UPDATE_CHANNEL_ID})
+    backend.write_guild_data(ctx.guild.id, data={'osu_update_channel': ctx.channel.id})
     await ctx.message.add_reaction('✅')
-    if oldUpdateChannelID:
-        await ctx.send(
-            f'Bonkers will now automatically send top scores in <#{ctx.channel.id}> instead of <#{oldUpdateChannelID}>'
-        )
-    else:
-        await ctx.send(f'Bonkers will now automatically send top scores in <#{ctx.channel.id}>')
+    await ctx.send(f'Bonkers will now automatically send top scores in <#{ctx.channel.id}>')
 
 
 @ enable_osu_automatic_updates.error
