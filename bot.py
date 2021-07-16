@@ -324,14 +324,15 @@ async def osu_auto_update():
         osuid = userData['osuid']
         topScores = get_top_scores(u=osuid, limit=100)
         recentTopScores = list(filter(is_recent_score, topScores))
-        # if len(recentTopScores):
-        #     allRecentTopScores[(uid, osuid)] = recentTopScores
         if len(recentTopScores):
+            user = get_user(osuid)
+            print(f'{user["username"]}: {len(recentTopScores)} top scores')
+            logger.debug(f'{user["username"]}: {len(recentTopScores)} top scores')
             for gid in registeredGuilds:
                 guildData = allGuildData.get(str(gid), {})
                 cid = guildData.get('osu_update_channel')
                 if not cid:
-                    logger.warn(f'registered guild {gid} has no auto update channel set')
+                    logger.warning(f'registered guild {gid} has no auto update channel set')
                     continue
                 channel = bot.get_channel(cid)
                 if not channel or channel.type != ChannelType.text:
@@ -347,7 +348,6 @@ async def osu_auto_update():
                 ))
                 if len(filteredRecentTopScores):
                     await channel.send(f'New top scores for <@{uid}>')
-                    user = get_user(osuid)
                     for score in filteredRecentTopScores:
                         await channel.send(embed=get_score_embed(score, osuid, user['username']))
 
