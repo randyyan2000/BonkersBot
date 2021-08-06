@@ -275,7 +275,7 @@ async def osu_leaderboard(ctx: Context, mode: int = 0):
                 guildUsers.append(user)
             else:
                 await ctx.send(
-                    f'Profile retrieval failed for user {osu.profile_link(userData["osuid"])}'
+                    f'Profile retrieval failed for user {osu.profile_link(userData["osuid"])} <@{uid}>'
                 )
     guildUsers.sort(key=lambda user: (int(user['pp_rank'] or 0) or float('inf'), -float(user['level'] or 0)))
     chunkedGuildUsers = chunk(guildUsers, 10)
