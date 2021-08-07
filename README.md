@@ -26,5 +26,6 @@ Using Ameo's [osu!track api](https://github.com/Ameobea/osutrack-api) for osu!tr
 - [X]  command for per server leaderboard (pp, rank)
 - [X]  replay download links in score embeds
 - [X]  300/100/50/X counts in score embeds
-- [X]  add top score cutoff for automatic osu updates
+- [X]  add top score rank cutoff for automatic osu updates
 - [X]  add osu recent play command 
+- [X]  add top score pp cutoff (to reduce low score spam) for automatic osu updates

@@ -361,14 +361,16 @@ async def osu_auto_update():
                 channel = cast(TextChannel, channel)
 
                 # filter scores on osu_update_cutoff
-                scoreCutoff = min(guildData.get('osu_update_score_cutoff', 100), 100)
+                scoreCutoff = min(guildData.get('osu_update_score_rank_cutoff', 100), 100)
+                ppCutoff = max(guildData.get('osu_update_score_pp_cutoff', 0), 0)
                 filteredRecentTopScores = list(filter(
                     lambda score : score['ranking'] < scoreCutoff, recentTopScores
                 ))
                 if len(filteredRecentTopScores):
                     await channel.send(f'New top scores for <@{uid}>')
                     for score in filteredRecentTopScores:
-                        await channel.send(embed=get_score_embed(score, osuid, user['username']))
+                        if score['pp'] >= ppCutoff or score['ranking'] < 5:
+                            await channel.send(embed=get_score_embed(score, osuid, user['username']))
 
     # if len(allRecentTopScores):
     #     print(allRecentTopScores)
@@ -449,21 +451,36 @@ async def enable_osu_automatic_updates_error(ctx: Context, error):
     await ctx.send('You must be an admin to enable automatic top score updates')
 
 
-@ bot.command(aliases=('set_osu_update_cutoff', 'cutoff'),
+@ bot.command(aliases=('set_osu_update_rank_cutoff', 'rank_cutoff'),
               help='Sets the top score cutoff for automatic updates')
 @ commands.has_permissions(administrator=True)
-async def set_osu_auto_update_cutoff(ctx: Context, cutoff: int):
+async def set_osu_auto_update_rank_cutoff(ctx: Context, cutoff: int):
     if cutoff < 1 or cutoff > 100:
         return await ctx.send('Invalid cutoff (must be between 1-100)')
-    backend.write_guild_data(ctx.guild.id, data={'osu_update_score_cutoff': cutoff})
+    backend.write_guild_data(ctx.guild.id, data={'osu_update_score_rank_cutoff': cutoff})
     await ctx.message.add_reaction('✅')
-    await ctx.send(f'Bonkers will now only send update with scores in the top {cutoff}')
+    await ctx.send(f'Bonkers will now only send updates with scores in the top {cutoff}')
 
 
-@ set_osu_auto_update_cutoff.error
+@ set_osu_auto_update_rank_cutoff.error
 async def enable_osu_automatic_updates_error(ctx: Context, error):
-    await ctx.send('You must be an admin to set the top score update cutoff')
+    await ctx.send('You must be an admin to set the top score update rank cutoff')
 
+
+@ bot.command(aliases=('set_osu_update_pp_cutoff', 'pp_cutoff'),
+              help='Sets the top score pp cutoff for automatic updates (anything under the cutoff has to be a top 5 score')
+# @ commands.has_permissions(administrator=False)
+async def set_osu_auto_update_pp_cutoff(ctx: Context, cutoff: float):
+    if cutoff < 0:
+        return await ctx.send('Invalid cutoff (must be between 1-100)')
+    backend.write_guild_data(ctx.guild.id, data={'osu_auto_update_score_pp_cutoff': cutoff})
+    await ctx.message.add_reaction('✅')
+    await ctx.send(f'Bonkers will now only send updates with scores above {cutoff}pp unless it is a top 5 score')
+
+
+@ set_osu_auto_update_pp_cutoff.error
+async def enable_osu_automatic_updates_error(ctx: Context, error):
+    await ctx.send('You must be an admin to set the top score update pp cutoff')
 
 @ bot.command(aliases=('dt', 'test'), help='Super secret command used for testing during development')
 @ commands.has_permissions(administrator=True)

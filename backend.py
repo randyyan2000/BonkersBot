@@ -28,7 +28,8 @@ UserDataKey = Literal['osuid', 'bonks', 'guilds']
 
 class GuildData(TypedDict, total=False):
     osu_update_channel: int
-    osu_update_score_cutoff: int
+    osu_update_score_rank_cutoff: int
+    osu_update_score_pp_cutoff: float
     prefix: str
 
 
