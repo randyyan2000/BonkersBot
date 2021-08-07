@@ -319,8 +319,11 @@ async def osu_recent(ctx: Context, index: int = 1, *, u: Optional[str] = None):
         return await ctx.send('invalid user')
     recentScores = get_recent_scores(u=u, limit=index)
     if not recentScores:
-        return await ctx.send(f'No recent scores found for user {u}. Make sure to provide a valid osu username/id.')
-    score = recentScores[index - 1]
+        return await ctx.send(f'An error occured while retrieving recent scores for user {u}. Make sure to provide a valid osu username/id.')
+    try:
+        score = recentScores[index - 1]
+    except IndexError:
+        return await ctx.send(f'Recent score #{index} not found.')
     user = get_user(u)
     await ctx.send(embed=get_score_embed(score, user['user_id'], user['username']))
 
@@ -725,6 +728,7 @@ def get_recent_scores(u: str, limit: int, mode: int = 0) -> List[osu.Score]:
     )
     try:
         topScores = response.json()
+        print(len(topScores))
         return topScores
     except:
         logger.critical(f'get_user_best api call failed! Reponse: {response.text}')
