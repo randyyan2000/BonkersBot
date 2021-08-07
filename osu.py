@@ -6,7 +6,7 @@ from typing_extensions import Literal
 # osu types (mostly mirrors osu api/ameo api documentation) with exceptions commented
 # osu! api: https://github.com/ppy/osu-api/wiki
 # osu!track api (ameo): https://github.com/Ameobea/osutrack-api
-ScoreRank = Literal['D', 'C', 'B', 'A', 'S', 'SH', 'X', 'SS', 'XH', 'SSH']
+ScoreRank = Literal['F', 'D', 'C', 'B', 'A', 'S', 'SH', 'X', 'SS', 'XH', 'SSH']
 
 # fmt: off
 class Beatmap(TypedDict):

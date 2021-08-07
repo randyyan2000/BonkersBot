@@ -54,6 +54,8 @@ OSU_SCORE_EMOJI_MAP: Mapping[osu.ScoreRank, str] = {
     'A': '<:osuA:835607165263020052>',
     'B': '<:osuB:835611278357299202>',
     'C': '<:osuC:835611278172487694>',
+    'D': '<:osuD:873655369698783262>',
+    'F': f'ℱ {KEKW_EMOTE}',
 }
 OSU_HIT_EMOJI_MAP = {
     'miss': '<:osuMiss:849349136955867166>',
