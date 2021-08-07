@@ -306,6 +306,25 @@ async def osu_leaderboard(ctx: Context, mode: int = 0):
         await ctx.send(embed=leaderboardEmbed)
 
 
+@ bot.command(
+    aliases=('recent', 'rp'),
+    help='$recent (<index=1>) (<username/userid>) gets the #index most recent score for a given osu user (defaults to your registered user)'
+)
+async def osu_recent(ctx: Context, index: int = 1, *, u: Optional[str] = None):
+    if index < 1 or index > 50:
+        return await ctx.send('invalid recent score index (must be between 1-100)')
+    if not u:
+        u = get_osuid(ctx)
+    if not u:
+        return await ctx.send('invalid user')
+    recentScores = get_recent_scores(u=u, limit=index)
+    if not recentScores:
+        return await ctx.send(f'No recent scores found for user {u}. Make sure to provide a valid osu username/id.')
+    score = recentScores[index - 1]
+    user = get_user(u)
+    await ctx.send(embed=get_score_embed(score, user['user_id'], user['username']))
+
+
 @ tasks.loop(minutes=10)
 async def osu_auto_update():
     print(f'Running top score update for {dt.datetime.now()}')
@@ -486,7 +505,7 @@ def get_score_embed(score: osu.Score, osuid: str, username: str) -> Embed:
         f'{osu_score_emoji(score["rank"])} | '
         f'{osu.mod_string(int(score["enabled_mods"]))} | '
         f'{get_score_acc(score)}% ({score["maxcombo"]}/{bmp["max_combo"]}) | '
-        f'{score["pp"]}pp | '
+        f'{score["pp"] if "pp" in score else "?"}pp | ' 
         f'{get_score_timedelta(score)}**\n'
         f'{OSU_HIT_EMOJI_MAP["300"]} {score["count300"]} '
         f'{OSU_HIT_EMOJI_MAP["100"]} {score["count100"]}'
@@ -494,7 +513,7 @@ def get_score_embed(score: osu.Score, osuid: str, username: str) -> Embed:
         f'{OSU_HIT_EMOJI_MAP["miss"]} {score["countmiss"]}\n\n'
         f'**Beatmap Info** ({bmp["beatmap_id"]})'
     )
-    if int(score['replay_available']) == 1:
+    if int(score.get('replay_available', 0)) == 1:
         description += f' ([Replay]({osu.score_replay_link(score["score_id"])}))'
     description += (
         f'\nLength **{format_seconds(int(bmp["total_length"]))}** ~ '
@@ -511,7 +530,7 @@ def get_score_embed(score: osu.Score, osuid: str, username: str) -> Embed:
         color=EMBED_COLOR,
         description=description,
     )
-    authortitle = f'{username} - #{score["ranking"] + 1} Top Play' if 'ranking' in score else username
+    authortitle = f'{username} - #{score["ranking"] + 1} Top Play' if 'ranking' in score and score['ranking'] < 0 else username
     scoreEmbed.set_author(name=authortitle, url=osu.profile_link(osuid), icon_url=osu.profile_thumb(osuid))
     scoreEmbed.set_thumbnail(url=osu.beatmap_thumb(bmp['beatmapset_id']))
     return scoreEmbed
@@ -676,6 +695,19 @@ def get_top_scores(u: str, limit: int) -> List[osu.Score]:
         topScores = response.json()
         for i, score in enumerate(topScores):
             score["ranking"] = i
+        return topScores
+    except:
+        logger.critical(f'get_user_best api call failed! Reponse: {response.text}')
+        return []
+
+
+def get_recent_scores(u: str, limit: int, mode: int = 0) -> List[osu.Score]:
+    response = requests.post(
+        f'{OSU_API_ENDPOINT}get_user_recent',
+        params={'k': OSU_API_KEY, 'u': u, 'limit': limit, 'm': mode}
+    )
+    try:
+        topScores = response.json()
         return topScores
     except:
         logger.critical(f'get_user_best api call failed! Reponse: {response.text}')
