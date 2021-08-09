@@ -374,7 +374,7 @@ async def osu_auto_update():
                 if len(filteredRecentTopScores):
                     await channel.send(f'New top scores for <@{uid}>')
                     for score in filteredRecentTopScores:
-                        if score['pp'] >= ppCutoff or score['ranking'] < 5:
+                        if float(score['pp']) >= ppCutoff or score['ranking'] < 5:
                             await channel.send(embed=get_score_embed(score, osuid, user['username']))
 
     # if len(allRecentTopScores):
