@@ -371,11 +371,13 @@ async def osu_auto_update():
                 filteredRecentTopScores = list(filter(
                     lambda score : score['ranking'] < scoreCutoff, recentTopScores
                 ))
+                filteredRecentTopScores = list(filter(
+                    lambda score : float(score['pp']) >= ppCutoff or score['ranking'] < 5, filteredRecentTopScores
+                ))
                 if len(filteredRecentTopScores):
                     await channel.send(f'New top scores for <@{uid}>')
                     for score in filteredRecentTopScores:
-                        if float(score['pp']) >= ppCutoff or score['ranking'] < 5:
-                            await channel.send(embed=get_score_embed(score, osuid, user['username']))
+                        await channel.send(embed=get_score_embed(score, osuid, user['username']))
 
     # if len(allRecentTopScores):
     #     print(allRecentTopScores)
@@ -478,7 +480,7 @@ async def enable_osu_automatic_updates_error(ctx: Context, error):
 async def set_osu_auto_update_pp_cutoff(ctx: Context, cutoff: float):
     if cutoff < 0:
         return await ctx.send('Invalid cutoff (must be between 1-100)')
-    backend.write_guild_data(ctx.guild.id, data={'osu_auto_update_score_pp_cutoff': cutoff})
+    backend.write_guild_data(ctx.guild.id, data={'osu_update_score_pp_cutoff': cutoff})
     await ctx.message.add_reaction('✅')
     await ctx.send(f'Bonkers will now only send updates with scores above {cutoff}pp unless it is a top 5 score')
 
@@ -552,7 +554,7 @@ def get_score_embed(score: osu.Score, osuid: str, username: str) -> Embed:
         color=EMBED_COLOR,
         description=description,
     )
-    authortitle = f'{username} - #{score["ranking"] + 1} Top Play' if 'ranking' in score and score['ranking'] < 0 else username
+    authortitle = f'{username} - #{score["ranking"] + 1} Top Play' if 'ranking' in score and score['ranking'] >= 0 else username
     scoreEmbed.set_author(name=authortitle, url=osu.profile_link(osuid), icon_url=osu.profile_thumb(osuid))
     scoreEmbed.set_thumbnail(url=osu.beatmap_thumb(bmp['beatmapset_id']))
     return scoreEmbed
