@@ -263,7 +263,10 @@ async def osu_map(ctx: Context, beatmapid: str):
     aliases=('l', 'sl'),
     help='displays a leaderboard for registered osu profiles in this server'
 )
-async def osu_leaderboard(ctx: Context, mode: int = 0):
+async def osu_leaderboard(ctx: Context, *, modeString: Optional[str] = '0'):
+    mode = get_mode(modeString)
+    if mode is None:
+        return await ctx.send(f'Invalid gamemode {modeString}')
     gid = ctx.guild.id
     userData = backend.read_all_data(backend.USER_DATA)
     guildUsers: List[osu.User] = []
@@ -280,14 +283,15 @@ async def osu_leaderboard(ctx: Context, mode: int = 0):
                     f'Profile retrieval failed for user {osu.profile_link(userData["osuid"])} <@{uid}>'
                 )
     guildUsers.sort(key=lambda user: (int(user['pp_rank'] or 0) or float('inf'), -float(user['level'] or 0)))
-    chunkedGuildUsers = chunk(guildUsers, 10)
+    chunksize = 10
+    chunkedGuildUsers = chunk(guildUsers, chunksize)
 
     first = True
-    for userChunk in chunkedGuildUsers:
+    for cidx, userChunk in enumerate(chunkedGuildUsers):
         leaderboardRows = []
         for i, user in enumerate(userChunk):
             leaderboardRows.append(
-                f'**#{i + 1}** '
+                f'**#{(cidx * chunksize) + i + 1}** '
                 f'{flag(user["country"])} [{user["username"]}]({osu.profile_link(user["user_id"])}) - '
                 f'#{int(user["pp_rank"] or 0):n} | '
                 f'{float(user["pp_raw"] or 0):n}pp | '
@@ -647,6 +651,15 @@ def get_beatmap_embed(bmp: osu.Beatmap):
 
 def get_osuid(ctx: Context) -> Optional[str]:
     return backend.read_user_data(ctx.author.id, 'osuid')
+
+
+def get_mode(modeString: str) -> Optional[str]:
+    if modeString.isnumeric() and 0 <= int(modeString) <= 4:
+        return int(modeString)
+    elif modeString in osu.MODE_STRING_MAPPING:
+        return osu.MODE_STRING_MAPPING[modeString]
+    else:
+        return None
 
 
 def format_seconds(seconds: int) -> str:

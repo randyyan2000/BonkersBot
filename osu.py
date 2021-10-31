@@ -166,6 +166,23 @@ MODE_STRING_ENUM = {
     2 : 'CtB',
     3 : 'osu!mania',
 }
+
+MODE_STRING_MAPPING = {
+    'osu!': 0,
+    'osu': 0,
+    'osu standard': 0,
+    'standard': 0,
+    'std': 0,
+    'o': 0,
+    'taiko': 1,
+    't': 1,
+    'catch': 2,
+    'catch the beat': 2,
+    'ctb': 2,
+    'c': 2,
+    'mania': 3,
+    'm': 3,
+}
 # fmt: on
 
 
