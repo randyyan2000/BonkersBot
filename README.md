@@ -1,9 +1,19 @@
+# BonkersBot
+
 My first attempt at making discord bot :D
 
-To be used personally (and maybe by a few friends) to track new scores for osu
+To be used personally (and some friends) to track new scores for osu.
 
 Using Ameo's [osu!track api](https://github.com/Ameobea/osutrack-api) for osu!track updates and also [osu!api v1](https://github.com/ppy/osu-api/wiki) for getting beatmap, score, and user data.
 
+## Screenshots
+Automatic score update:  
+![Automatic score update](/screenshots/1.png)  
+Profile card:  
+![Profile card](/screenshots/2.png)  
+... and more!
+
+## Feature Checklist
 ### TODO 
 - [ ]  update score embed difficulties based on enabled mods (dt/ht, hr/ez)
 - [ ]  better error handling for invalid arguments/usage documentation
