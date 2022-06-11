@@ -1,4 +1,5 @@
 # bot.py
+import asyncio
 import datetime as dt
 import logging
 import os
@@ -286,10 +287,12 @@ async def osu_leaderboard(ctx: Context, *, modeString: Optional[str] = '0'):
     chunksize = 10
     chunkedGuildUsers = chunk(guildUsers, chunksize)
 
-    first = True
-    for cidx, userChunk in enumerate(chunkedGuildUsers):
+    pages = len(chunkedGuildUsers)
+    cidx = 0
+    # send first leaderboard page
+    def leaderboardContent(cidx: int) -> str:
         leaderboardRows = []
-        for i, user in enumerate(userChunk):
+        for i, user in enumerate(chunkedGuildUsers[cidx]):
             leaderboardRows.append(
                 f'**#{(cidx * chunksize) + i + 1}** '
                 f'{flag(user["country"])} [{user["username"]}]({osu.profile_link(user["user_id"])}) - '
@@ -297,19 +300,76 @@ async def osu_leaderboard(ctx: Context, *, modeString: Optional[str] = '0'):
                 f'{float(user["pp_raw"] or 0):n}pp | '
                 f'LVL {float(user["level"] or 0):.2f}'
             )
+        return '\n'.join(leaderboardRows)
 
-        leaderboardEmbed = Embed(
-            type='rich',
-            color=EMBED_COLOR,
-            description='\n'.join(leaderboardRows)
-        )
-        if first:
-            leaderboardEmbed.set_author(
-                name=f'{osu.MODE_STRING_ENUM[mode]} leaderboard for {ctx.guild.name}',
-                icon_url=str(ctx.guild.icon_url) or Embed.Empty,
-            )
-            first = False
-        await ctx.send(embed=leaderboardEmbed)
+    ldict = {
+        'type': 'rich',
+        'color': EMBED_COLOR.value,
+        'description': leaderboardContent(cidx),
+        'author': {
+            'name': f'{osu.MODE_STRING_ENUM[mode]} leaderboard for {ctx.guild.name}',
+            'icon_url': str(ctx.guild.icon_url) or '',
+        },
+        'footer': {
+            'text': f'Page {cidx + 1}/{pages}'
+        },
+    }
+    leaderboardEmbed = Embed.from_dict(ldict)
+    message = await ctx.send(embed=leaderboardEmbed)
+    await message.add_reaction('◀')
+    await message.add_reaction('▶')
+
+    def check(reaction, user):
+        return user == ctx.author and (str(reaction.emoji) == '◀' or str(reaction.emoji) == '▶')
+
+    # handle pagination
+    while True:
+        try:
+            reaction, user = await bot.wait_for('reaction_add', timeout=15.0, check=check)
+        except asyncio.TimeoutError:
+            break
+        else:
+            print(reaction, user, cidx)
+            # invalid page change
+            if (str(reaction) == '◀' and cidx == 0) or (str(reaction) == '▶' and cidx == pages - 1):
+                await message.remove_reaction(emoji=reaction, member=user)
+                continue
+ 
+            if str(reaction) == '◀':
+                cidx -= 1
+            else: # str(reaction) == '▶'
+                cidx += 1
+            ldict['description'] = leaderboardContent(cidx)
+            ldict['footer']['text'] = f'Page {cidx + 1}/{pages}'
+            await message.edit(embed=Embed.from_dict(ldict))
+            await message.remove_reaction(emoji=reaction, member=user)
+
+    # old leaderboard code - sends entire leaderboard in chunks all at once
+
+    # first = True
+    # for cidx, userChunk in enumerate(chunkedGuildUsers):
+    #     leaderboardRows = []
+    #     for i, user in enumerate(userChunk):
+    #         leaderboardRows.append(
+    #             f'**#{(cidx * chunksize) + i + 1}** '
+    #             f'{flag(user["country"])} [{user["username"]}]({osu.profile_link(user["user_id"])}) - '
+    #             f'#{int(user["pp_rank"] or 0):n} | '
+    #             f'{float(user["pp_raw"] or 0):n}pp | '
+    #             f'LVL {float(user["level"] or 0):.2f}'
+    #         )
+
+    #     leaderboardEmbed = Embed(
+    #         type='rich',
+    #         color=EMBED_COLOR,
+    #         description='\n'.join(leaderboardRows)
+    #     )
+    #     if first:
+    #         leaderboardEmbed.set_author(
+    #             name=f'{osu.MODE_STRING_ENUM[mode]} leaderboard for {ctx.guild.name}',
+    #             icon_url=str(ctx.guild.icon_url) or Embed.Empty,
+    #         )
+    #         first = False
+    #     await ctx.send(embed=leaderboardEmbed)
 
 
 @ bot.command(

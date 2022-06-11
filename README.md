@@ -20,7 +20,6 @@ Profile card:
 - [ ]  add per beatmap score leaderboard for guild members
 - [ ]  add rotating logging handler
 - [ ]  automatic type conversion for api response objects AND none/null handling
-- [ ]  allow for per server leaderboard for a given map 
 - [ ]  add support for other osu game modes
   - [X]  done for osu_leaderboard (needs to be made more user friendly i.e. recognizing gamemode name strings)
   
@@ -39,3 +38,4 @@ Profile card:
 - [X]  add top score rank cutoff for automatic osu updates
 - [X]  add osu recent play command 
 - [X]  add top score pp cutoff (to reduce low score spam) for automatic osu updates
+- [X]  paginate osu leaderboard (controlled with emoji reactions)
