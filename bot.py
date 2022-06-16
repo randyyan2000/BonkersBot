@@ -327,9 +327,10 @@ async def osu_leaderboard(ctx: Context, *, modeString: Optional[str] = '0'):
         try:
             reaction, user = await bot.wait_for('reaction_add', timeout=15.0, check=check)
         except asyncio.TimeoutError:
+            await message.clear_reaction(emoji='◀')
+            await message.clear_reaction(emoji='▶')
             break
         else:
-            print(reaction, user, cidx)
             # invalid page change
             if (str(reaction) == '◀' and cidx == 0) or (str(reaction) == '▶' and cidx == pages - 1):
                 await message.remove_reaction(emoji=reaction, member=user)
@@ -339,6 +340,7 @@ async def osu_leaderboard(ctx: Context, *, modeString: Optional[str] = '0'):
                 cidx -= 1
             else: # str(reaction) == '▶'
                 cidx += 1
+            # update embed with new leaderboard page content
             ldict['description'] = leaderboardContent(cidx)
             ldict['footer']['text'] = f'Page {cidx + 1}/{pages}'
             await message.edit(embed=Embed.from_dict(ldict))
